@@ -47,7 +47,7 @@ function useTheme() {
   return { dark, toggle };
 }
 
-function MusicToggle({ on, off }: { on: string; off: string }) {
+function MusicToggle({ on, off, stop }: { on: string; off: string; stop: string }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -78,23 +78,43 @@ function MusicToggle({ on, off }: { on: string; off: string }) {
     }
   };
 
+  const stopPlayback = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+    setPlaying(false);
+  };
+
   return (
-    <button
-      onClick={toggle}
-      aria-label={playing ? on : off}
-      className="inline-flex items-center gap-2 rounded-full border-2 border-primary/70 bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
-    >
-      <span className="flex h-3 items-end gap-[2px]" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="w-[2px] rounded-full bg-current transition-all"
-            style={{ height: playing ? `${6 + i * 3}px` : "4px" }}
-          />
-        ))}
-      </span>
-      <span className="hidden sm:inline">{playing ? on : off}</span>
-    </button>
+    <div className="inline-flex items-center gap-1.5">
+      <button
+        onClick={toggle}
+        aria-label={playing ? on : off}
+        className="inline-flex items-center gap-2 rounded-full border-2 border-primary/70 bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
+      >
+        <span className="flex h-3 items-end gap-[2px]" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-[2px] rounded-full bg-current transition-all"
+              style={{ height: playing ? `${6 + i * 3}px` : "4px" }}
+            />
+          ))}
+        </span>
+        <span className="hidden sm:inline">{playing ? on : off}</span>
+      </button>
+      {playing && (
+        <button
+          onClick={stopPlayback}
+          aria-label={stop}
+          title={stop}
+          className="inline-flex items-center justify-center rounded-full border-2 border-primary/70 bg-card p-1.5 text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          <Square className="h-3 w-3 fill-current" />
+        </button>
+      )}
+    </div>
   );
 }
 
