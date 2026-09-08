@@ -23,9 +23,9 @@ export const Chatbox: React.FC = () => {
         throw new Error('Chưa tìm thấy VITE_GEMINI_API_KEY');
       }
 
-      // Đã đổi model sang gemini-2.5-flash chuẩn nhất hiện tại
+      // Cập nhật endpoint chính xác theo yêu cầu API: gemini-3.6-flash
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
