@@ -53,18 +53,46 @@ function useTheme() {
 
 function MusicToggle({ on, off, stop }: { on: string; off: string; stop: string }) {
   const [playing, setPlaying] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const youtubeVideoId = "-nJ0WHEetsQ";
+
+  // URL nhúng YouTube chuẩn cho Autoplay + Loop
+  const audioSrc = `https://www.youtube.com/embed/${youtubeVideoId}?enablejsapi=1&autoplay=1&mute=0&loop=1&playlist=${youtubeVideoId}`;
+
+  useEffect(() => {
+    // Thử tự bật nhạc khi vừa tải trang
+    setPlaying(true);
+
+    // Kích hoạt phát nhạc khi có tương tác đầu tiên nếu trình duyệt chặn autoplay ban đầu
+    const handleFirstInteraction = () => {
+      setPlaying(true);
+      window.removeEventListener("click", handleFirstInteraction);
+      window.removeEventListener("touchstart", handleFirstInteraction);
+      window.removeEventListener("scroll", handleFirstInteraction);
+    };
+
+    window.addEventListener("click", handleFirstInteraction);
+    window.addEventListener("touchstart", handleFirstInteraction);
+    window.addEventListener("scroll", handleFirstInteraction);
+
+    return () => {
+      window.removeEventListener("click", handleFirstInteraction);
+      window.removeEventListener("touchstart", handleFirstInteraction);
+      window.removeEventListener("scroll", handleFirstInteraction);
+    };
+  }, []);
 
   const toggle = () => setPlaying((prev) => !prev);
   const stopPlayback = () => setPlaying(false);
 
   return (
     <div className="inline-flex items-center gap-1.5">
-      {/* Giữ Iframe trong DOM để tránh delay mount */}
+      {/* Nạp Iframe YouTube */}
       <iframe
+        ref={iframeRef}
         width="0"
         height="0"
-        src={playing ? `https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&loop=1&playlist=${youtubeVideoId}` : ""}
+        src={playing ? audioSrc : ""}
         title="Background Music"
         allow="autoplay"
         className="hidden"
@@ -138,7 +166,7 @@ function Portfolio() {
 
   useEffect(() => {
     const saved = localStorage.getItem("lang") as Lang | null;
-    if (saved && ["vi", "en", "ko"].includes(saved)) setLang(saved);
+    if (saved && ["vi", "en", "kr"].includes(saved)) setLang(saved);
   }, []);
 
   const pick = (code: Lang) => {

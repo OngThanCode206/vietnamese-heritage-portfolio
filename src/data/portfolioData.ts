@@ -76,7 +76,7 @@ export const content: Record<Lang, Content> = {
     ui: {
       eyebrow: "Portfolio · Sinh viên CNTT",
       role: "Sinh viên Công nghệ Thông tin — HUTECH",
-      tagline: "AI • IoT / Hệ thống nhúng • Java Web Developer",
+      tagline: "AI • IoT / Hệ thống nhúng • Web Developer",
       intro:
         "Mình theo đuổi con đường kết hợp giữa phần cứng và phần mềm: từ cảm biến ESP32 ngoài đời thực đến hệ thống web Java Spring Boot và các mô hình AI. Định hướng phát triển: AI, IoT/Hệ thống nhúng và Java Web Developer.",
       cv: "Xem CV",
@@ -146,7 +146,7 @@ export const content: Record<Lang, Content> = {
       },
     ],
     skills: [
-      { group: "Ngôn ngữ", items: ["Java", "C/C++", "Python", "SQL"] },
+      { group: "Ngôn ngữ", items: ["Java", "C/C++", "Python", "SQL", "JavaScript", "C#"] },
       { group: "Framework & Tech", items: ["Spring Boot", "Spring Security", "Thymeleaf", "JPA/Hibernate"] },
       { group: "Tools & Hardware", items: ["MySQL", "Git", "ESP32", "Arduino", "Raspberry Pi"] },
     ],
@@ -155,7 +155,7 @@ export const content: Record<Lang, Content> = {
       { year: "2025", title: "Bài báo khoa học công bố (Dự án IECMS)" },
       { year: "2025", title: 'Giải Ba — Rung Chuông Vàng "Tìm hiểu ASEAN"' },
       { year: "2025", title: "Giải Khuyến khích — AIoT Innoworks" },
-      { year: "—", title: "Chứng chỉ WISE-IoT WISE-PASS Core Level 1 & Level 2" },
+      { year: "2025", title: "Chứng chỉ WISE-IoT WISE-PASS Core Level 1 & Level 2" },
     ],
   },
 
