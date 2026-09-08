@@ -151,6 +151,14 @@ function Portfolio() {
             className="h-[115%] w-auto max-w-none opacity-[0.23] brightness-125 saturate-125"
             style={{ filter: "drop-shadow(0 0 30px oklch(0.72 0.12 78 / 0.35))" }}
           />
+          <div className="absolute inset-0 hidden md:block">
+            <span className="absolute left-[62%] top-[42%] text-[10px] font-semibold uppercase tracking-[0.15em] text-accent opacity-60">
+              • • Hoàng Sa
+            </span>
+            <span className="absolute left-[58%] top-[64%] text-[10px] font-semibold uppercase tracking-[0.15em] text-accent opacity-60">
+              • • • Trường Sa
+            </span>
+          </div>
         </div>
 
         <div className="relative mx-auto grid max-w-5xl gap-12 px-6 py-20 md:grid-cols-[1.4fr_1fr] md:items-center md:py-28">
