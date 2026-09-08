@@ -10,7 +10,7 @@ export const profile = {
   name: "Võ Lê Cao Kỳ",
   gpa: "3.42 / 4.0",
   /** Đổi thành "/avatar.jpg" để dùng ảnh của bạn trong thư mục public */
-  avatar: "",
+  avatar: "/avatar.jpg",
   cvUrl:
     "https://www.topcv.vn/xem-cv/A1ZSB1pQVAECV1cCDQNZVAELVFZWVgFfUA8NBQdf59",
   music: "/music.mp3",
