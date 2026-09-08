@@ -73,7 +73,7 @@ export const content: Record<Lang, Content> = {
       contact: "Liên hệ",
     },
     ui: {
-      eyebrow: "Tranh cổ động · Vũ trụ Retro",
+      eyebrow: "Portfolio · Sinh viên CNTT",
       role: "Sinh viên Công nghệ Thông tin — HUTECH",
       tagline: "AI • IoT / Hệ thống nhúng • Java Web Developer",
       intro:
@@ -88,7 +88,7 @@ export const content: Record<Lang, Content> = {
       avatarCaption: "HUTECH · Sinh viên CNTT",
       hoangSa: "Hoàng Sa",
       truongSa: "Trường Sa",
-      footer: "Tranh cổ động Retro · Vũ trụ Việt Nam",
+      footer: "Võ Lê Cao Kỳ · Sinh viên CNTT HUTECH",
     },
     sections: {
       experience: { eyebrow: "Work Experiences", title: "Kinh nghiệm làm việc" },
@@ -153,7 +153,7 @@ export const content: Record<Lang, Content> = {
       { year: "2025", title: "Bài báo khoa học công bố (Dự án IECMS)" },
       { year: "2025", title: 'Giải Ba — Rung Chuông Vàng "Tìm hiểu ASEAN"' },
       { year: "2025", title: "Giải Khuyến khích — AIoT Innoworks" },
-      { year: "—", title: "Chứng chỉ Quốc tế WISE-IoT WISE-PASS Core Level 1 & Level 2" },
+      { year: "—", title: "Chứng chỉ WISE-IoT WISE-PASS Core Level 1 & Level 2" },
     ],
   },
 
@@ -167,7 +167,7 @@ export const content: Record<Lang, Content> = {
       contact: "Contact",
     },
     ui: {
-      eyebrow: "Retro Space Propaganda · Viet Heritage",
+      eyebrow: "Portfolio · IT Student",
       role: "Information Technology Student — HUTECH",
       tagline: "AI • IoT / Embedded Systems • Java Web Developer",
       intro:
@@ -182,7 +182,7 @@ export const content: Record<Lang, Content> = {
       avatarCaption: "HUTECH · IT Student",
       hoangSa: "Hoang Sa",
       truongSa: "Truong Sa",
-      footer: "Retro Space Propaganda · Viet Heritage",
+      footer: "Vo Le Cao Ky · IT Student at HUTECH",
     },
     sections: {
       experience: { eyebrow: "Work Experiences", title: "Work experience" },
@@ -247,7 +247,7 @@ export const content: Record<Lang, Content> = {
       { year: "2025", title: "Published scientific paper (IECMS project)" },
       { year: "2025", title: 'Third Prize — "Understanding ASEAN" Golden Bell contest' },
       { year: "2025", title: "Consolation Prize — AIoT Innoworks" },
-      { year: "—", title: "WISE-IoT WISE-PASS Core Level 1 & Level 2 international certificates" },
+      { year: "—", title: "WISE-IoT WISE-PASS Core Level 1 & Level 2 certificates" },
     ],
   },
 
@@ -261,7 +261,7 @@ export const content: Record<Lang, Content> = {
       contact: "연락처",
     },
     ui: {
-      eyebrow: "레트로 우주 선전화 · 베트남 유산",
+      eyebrow: "포트폴리오 · IT 전공 학생",
       role: "정보기술 전공 학생 — HUTECH",
       tagline: "AI • IoT / 임베디드 시스템 • Java 웹 개발자",
       intro:
@@ -276,7 +276,7 @@ export const content: Record<Lang, Content> = {
       avatarCaption: "HUTECH · IT 학생",
       hoangSa: "호앙사",
       truongSa: "쯔엉사",
-      footer: "레트로 우주 선전화 · 베트남 유산",
+      footer: "Võ Lê Cao Kỳ · HUTECH IT 전공 학생",
     },
     sections: {
       experience: { eyebrow: "Work Experiences", title: "업무 경력" },
@@ -339,7 +339,7 @@ export const content: Record<Lang, Content> = {
       { year: "2025", title: "학술 논문 발표 (IECMS 프로젝트)" },
       { year: "2025", title: '"아세안 알기" 골든벨 3등상' },
       { year: "2025", title: "AIoT Innoworks 장려상" },
-      { year: "—", title: "WISE-IoT WISE-PASS Core Level 1 & 2 국제 자격증" },
+      { year: "—", title: "WISE-IoT WISE-PASS Core Level 1 & 2 자격증" },
     ],
   },
 };
