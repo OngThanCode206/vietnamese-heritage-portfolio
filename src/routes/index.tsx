@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Moon, Sun, Globe } from "lucide-react";
+import { Moon, Sun, Globe, Square } from "lucide-react";
 import { content, languages, profile, socials, type Lang } from "@/data/portfolioData";
 import mapPoster from "@/assets/viet-map-poster.png";
 import motifs from "@/assets/retro-space-motifs.png";
@@ -9,13 +9,13 @@ import avatarDefault from "@/assets/avatar-default.jpg";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Võ Lê Cao Kỳ — Retro Space Propaganda Portfolio" },
+      { title: "Võ Lê Cao Kỳ — Portfolio" },
       {
         name: "description",
         content:
-          "Portfolio của Võ Lê Cao Kỳ, sinh viên CNTT HUTECH: dự án IoT/AI, Java Spring Boot, thành tích và kinh nghiệm, phong cách tranh cổ động Việt Nam pha vũ trụ retro.",
+          "Portfolio của Võ Lê Cao Kỳ, sinh viên CNTT HUTECH: dự án IoT/AI, Java Spring Boot, thành tích và kinh nghiệm làm việc.",
       },
-      { property: "og:title", content: "Võ Lê Cao Kỳ — Retro Space Propaganda Portfolio" },
+      { property: "og:title", content: "Võ Lê Cao Kỳ — Portfolio" },
       {
         property: "og:description",
         content:
