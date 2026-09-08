@@ -5,6 +5,7 @@ import { content, languages, profile, socials, type Lang } from "@/data/portfoli
 import mapPoster from "@/assets/viet-map-poster.png";
 import motifs from "@/assets/retro-space-motifs.png";
 import avatarDefault from "@/assets/avatar-default.jpg";
+import { Chatbox } from "../components/Chatbox";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -30,12 +31,14 @@ export const Route = createFileRoute("/")({
 
 function useTheme() {
   const [dark, setDark] = useState(false);
+
   useEffect(() => {
     const saved = localStorage.getItem("theme");
-    const isDark = saved === "dark";
+    const isDark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
     setDark(isDark);
     document.documentElement.classList.toggle("dark", isDark);
   }, []);
+
   const toggle = () => {
     setDark((prev) => {
       const next = !prev;
@@ -44,51 +47,31 @@ function useTheme() {
       return next;
     });
   };
+
   return { dark, toggle };
 }
 
 function MusicToggle({ on, off, stop }: { on: string; off: string; stop: string }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
+  const youtubeVideoId = "-nJ0WHEetsQ";
 
-  useEffect(() => {
-    const audio = new Audio(profile.music);
-    audio.loop = true;
-    audio.volume = 0.35;
-    audioRef.current = audio;
-    return () => {
-      audio.pause();
-      audioRef.current = null;
-    };
-  }, []);
-
-  const toggle = async () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playing) {
-      audio.pause();
-      setPlaying(false);
-    } else {
-      try {
-        await audio.play();
-        setPlaying(true);
-      } catch {
-        setPlaying(false);
-      }
-    }
-  };
-
-  const stopPlayback = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.pause();
-    audio.currentTime = 0;
-    setPlaying(false);
-  };
+  const toggle = () => setPlaying((prev) => !prev);
+  const stopPlayback = () => setPlaying(false);
 
   return (
     <div className="inline-flex items-center gap-1.5">
+      {/* Giữ Iframe trong DOM để tránh delay mount */}
+      <iframe
+        width="0"
+        height="0"
+        src={playing ? `https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&loop=1&playlist=${youtubeVideoId}` : ""}
+        title="Background Music"
+        allow="autoplay"
+        className="hidden"
+      />
+
       <button
+        type="button"
         onClick={toggle}
         aria-label={playing ? on : off}
         className="inline-flex items-center gap-2 rounded-full border-2 border-primary/70 bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -104,8 +87,10 @@ function MusicToggle({ on, off, stop }: { on: string; off: string; stop: string 
         </span>
         <span className="hidden sm:inline">{playing ? on : off}</span>
       </button>
+
       {playing && (
         <button
+          type="button"
           onClick={stopPlayback}
           aria-label={stop}
           title={stop}
@@ -202,6 +187,7 @@ function Portfolio() {
               {languages.map((l) => (
                 <button
                   key={l.code}
+                  type="button"
                   onClick={() => pick(l.code)}
                   aria-label={l.name}
                   aria-pressed={lang === l.code}
@@ -217,6 +203,7 @@ function Portfolio() {
             </div>
 
             <button
+              type="button"
               onClick={toggle}
               aria-label={dark ? t.ui.light : t.ui.dark}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary/70 bg-card text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -224,12 +211,12 @@ function Portfolio() {
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
-            <MusicToggle on={t.ui.musicOn} off={t.ui.musicOff} />
+            <MusicToggle on={t.ui.musicOn} off={t.ui.musicOff} stop={t.ui.musicOff} />
           </div>
         </div>
       </header>
 
-      {/* Hero */}
+      {/* Hero Section */}
       <section id="gioi-thieu" className="relative overflow-hidden scroll-mt-24">
         <div aria-hidden className="pointer-events-none absolute inset-0 flex justify-center">
           <img
@@ -301,7 +288,7 @@ function Portfolio() {
               <div className="overflow-hidden rounded-[1.5rem] border-2 border-gold bg-secondary">
                 <img
                   src={profile.avatar || avatarDefault}
-                  alt={`${profile.name}`}
+                  alt={`Chân dung ${profile.name}`}
                   width={640}
                   height={800}
                   className="aspect-[4/5] w-full object-cover"
@@ -315,6 +302,7 @@ function Portfolio() {
         </div>
       </section>
 
+      {/* Experience Section */}
       <Section
         id="kinh-nghiem"
         eyebrow={t.sections.experience.eyebrow}
@@ -338,6 +326,7 @@ function Portfolio() {
         </div>
       </Section>
 
+      {/* Projects Section */}
       <Section id="du-an" eyebrow={t.sections.projects.eyebrow} title={t.sections.projects.title}>
         <div className="grid gap-6 md:grid-cols-2">
           {t.projects.map((p) => (
@@ -364,6 +353,7 @@ function Portfolio() {
         </div>
       </Section>
 
+      {/* Skills Section */}
       <Section id="ky-nang" eyebrow={t.sections.skills.eyebrow} title={t.sections.skills.title}>
         <div className="grid gap-6 md:grid-cols-3">
           {t.skills.map((s) => (
@@ -381,6 +371,7 @@ function Portfolio() {
         </div>
       </Section>
 
+      {/* Achievements Section */}
       <Section
         id="thanh-tich"
         eyebrow={t.sections.achievements.eyebrow}
@@ -392,13 +383,16 @@ function Portfolio() {
               key={a.title}
               className="flex items-baseline gap-5 px-6 py-5 transition-colors hover:bg-secondary/60"
             >
-              <span className="font-display text-sm font-extrabold text-accent">{a.year}</span>
+              <span className="font-display text-sm font-extrabold text-accent">
+                {a.year}
+              </span>
               <span className="text-sm text-foreground">{a.title}</span>
             </li>
           ))}
         </ul>
       </Section>
 
+      {/* Contact Section */}
       <Section id="lien-he" eyebrow={t.sections.contact.eyebrow} title={t.sections.contact.title}>
         <div className="flex flex-wrap gap-3">
           {socials.map((s) => (
@@ -426,6 +420,8 @@ function Portfolio() {
       <footer className="border-t-2 border-primary/30 py-10 text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
         © {new Date().getFullYear()} {profile.name} · {t.ui.footer}
       </footer>
+
+      <Chatbox />
     </div>
   );
 }

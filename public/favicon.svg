@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="100%" height="100%">
+  <defs>
+    <!-- Hiệu ứng đổ bóng Retro nhẹ cho chữ -->
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-color="#B8860B" />
+    </filter>
+  </defs>
+
+  <!-- Khung nền bo góc vuông nhẹ style Retro Badge -->
+  <rect x="3" y="3" width="58" height="58" rx="14" fill="#0D1F2D" stroke="#D4AF37" stroke-width="3" />
+
+  <!-- Logo chữ VK (Võ Kỳ) lồng ghép độc bản -->
+  <g fill="#FFD700" filter="url(#shadow)">
+    <!-- Chữ V -->
+    <path d="M 12 18 L 21 18 L 27 38 L 33 18 L 42 18 L 31.5 46 L 22.5 46 Z" />
+    <!-- Chữ K kết nối liền khối -->
+    <path d="M 37 18 L 45 18 L 45 29 L 51 18 L 59 18 L 49.5 31.5 L 60 46 L 51 46 L 43.5 34.5 L 45 46 L 37 46 Z" />
+  </g>
+</svg>
