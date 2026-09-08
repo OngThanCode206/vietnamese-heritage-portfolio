@@ -1,25 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import {
-  achievements,
-  experiences,
-  profile,
-  projects,
-  skills,
-  socials,
-} from "@/data/portfolioData";
-import vietnamMap from "@/assets/vietnam-map.png";
+import { Moon, Sun, Globe } from "lucide-react";
+import { content, languages, profile, socials, type Lang } from "@/data/portfolioData";
+import mapPoster from "@/assets/viet-map-poster.png";
+import motifs from "@/assets/retro-space-motifs.png";
+import avatarDefault from "@/assets/avatar-default.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Võ Lê Cao Kỳ — Portfolio AI, IoT & Java Web" },
+      { title: "Võ Lê Cao Kỳ — Retro Space Propaganda Portfolio" },
       {
         name: "description",
         content:
-          "Portfolio của Võ Lê Cao Kỳ, sinh viên CNTT HUTECH: dự án IoT/AI, Java Spring Boot, thành tích và kinh nghiệm làm việc.",
+          "Portfolio của Võ Lê Cao Kỳ, sinh viên CNTT HUTECH: dự án IoT/AI, Java Spring Boot, thành tích và kinh nghiệm, phong cách tranh cổ động Việt Nam pha vũ trụ retro.",
       },
-      { property: "og:title", content: "Võ Lê Cao Kỳ — Portfolio AI, IoT & Java Web" },
+      { property: "og:title", content: "Võ Lê Cao Kỳ — Retro Space Propaganda Portfolio" },
       {
         property: "og:description",
         content:
@@ -32,16 +28,26 @@ export const Route = createFileRoute("/")({
   component: Portfolio,
 });
 
-const nav = [
-  { id: "gioi-thieu", label: "Giới thiệu" },
-  { id: "kinh-nghiem", label: "Kinh nghiệm" },
-  { id: "du-an", label: "Dự án" },
-  { id: "ky-nang", label: "Kỹ năng" },
-  { id: "thanh-tich", label: "Thành tích" },
-  { id: "lien-he", label: "Liên hệ" },
-];
+function useTheme() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    const isDark = saved === "dark";
+    setDark(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
+  }, []);
+  const toggle = () => {
+    setDark((prev) => {
+      const next = !prev;
+      document.documentElement.classList.toggle("dark", next);
+      localStorage.setItem("theme", next ? "dark" : "light");
+      return next;
+    });
+  };
+  return { dark, toggle };
+}
 
-function MusicToggle() {
+function MusicToggle({ on, off }: { on: string; off: string }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -75,8 +81,8 @@ function MusicToggle() {
   return (
     <button
       onClick={toggle}
-      aria-label={playing ? "Tắt nhạc nền" : "Bật nhạc nền"}
-      className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-medium tracking-wide text-foreground transition-colors hover:border-accent hover:text-accent"
+      aria-label={playing ? on : off}
+      className="inline-flex items-center gap-2 rounded-full border-2 border-primary/70 bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
     >
       <span className="flex h-3 items-end gap-[2px]" aria-hidden>
         {[0, 1, 2].map((i) => (
@@ -87,7 +93,7 @@ function MusicToggle() {
           />
         ))}
       </span>
-      {playing ? "Đang phát" : "Nhạc nền"}
+      <span className="hidden sm:inline">{playing ? on : off}</span>
     </button>
   );
 }
@@ -105,76 +111,142 @@ function Section({
 }) {
   return (
     <section id={id} className="mx-auto w-full max-w-5xl scroll-mt-24 px-6 py-16 md:py-24">
-      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">{eyebrow}</p>
-      <h2 className="mt-3 font-display text-3xl font-bold tracking-tight text-primary md:text-4xl">
+      <p className="inline-block -rotate-1 bg-accent px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.28em] text-accent-foreground">
+        {eyebrow}
+      </p>
+      <h2 className="mt-4 font-display text-3xl font-extrabold uppercase tracking-tight text-primary md:text-4xl">
         {title}
       </h2>
+      <div className="mt-3 h-1 w-24 bg-gold" />
       <div className="mt-10">{children}</div>
     </section>
   );
 }
 
+const cardClass =
+  "rounded-xl border-2 border-primary/25 bg-card p-6 shadow-[6px_6px_0_0_var(--gold)] transition-transform hover:-translate-y-1";
+
 function Portfolio() {
+  const [lang, setLang] = useState<Lang>("vi");
+  const { dark, toggle } = useTheme();
+  const t = content[lang];
+
+  useEffect(() => {
+    const saved = localStorage.getItem("lang") as Lang | null;
+    if (saved && ["vi", "en", "ko"].includes(saved)) setLang(saved);
+  }, []);
+
+  const pick = (code: Lang) => {
+    setLang(code);
+    localStorage.setItem("lang", code);
+  };
+
+  const nav = [
+    { id: "gioi-thieu", label: t.nav.about },
+    { id: "kinh-nghiem", label: t.nav.experience },
+    { id: "du-an", label: t.nav.projects },
+    { id: "ky-nang", label: t.nav.skills },
+    { id: "thanh-tich", label: t.nav.achievements },
+    { id: "lien-he", label: t.nav.contact },
+  ];
+
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground antialiased">
-      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-4">
-          <a href="#gioi-thieu" className="font-display text-sm font-bold tracking-[0.2em] text-primary">
-            V.L.C.K
+    <div className="paper-grain min-h-screen bg-background font-sans text-foreground antialiased">
+      <header className="sticky top-0 z-30 border-b-2 border-primary/30 bg-background/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+          <a
+            href="#gioi-thieu"
+            className="font-display text-sm font-extrabold tracking-[0.25em] text-primary"
+          >
+            ★ V.L.C.K
           </a>
-          <nav className="hidden items-center gap-6 md:flex">
+
+          <nav className="hidden items-center gap-6 lg:flex">
             {nav.map((n) => (
               <a
                 key={n.id}
                 href={`#${n.id}`}
-                className="text-sm text-muted-foreground transition-colors hover:text-accent"
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-accent"
               >
                 {n.label}
               </a>
             ))}
           </nav>
-          <MusicToggle />
+
+          <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-1 rounded-full border-2 border-primary/70 bg-card px-2 py-1"
+              aria-label={t.ui.language}
+            >
+              <Globe className="h-3.5 w-3.5 text-primary" aria-hidden />
+              {languages.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => pick(l.code)}
+                  aria-label={l.name}
+                  aria-pressed={lang === l.code}
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-bold tracking-wide transition-colors ${
+                    lang === l.code
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-accent"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={toggle}
+              aria-label={dark ? t.ui.light : t.ui.dark}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary/70 bg-card text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+
+            <MusicToggle on={t.ui.musicOn} off={t.ui.musicOff} />
+          </div>
         </div>
       </header>
 
-      {/* Intro */}
+      {/* Hero */}
       <section id="gioi-thieu" className="relative overflow-hidden scroll-mt-24">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 -top-24 bottom-0 flex justify-center"
-        >
+        <div aria-hidden className="pointer-events-none absolute inset-0 flex justify-center">
           <img
-            src={vietnamMap}
+            src={mapPoster}
             alt=""
             width={1024}
             height={1280}
-            className="h-[115%] w-auto max-w-none opacity-[0.23] brightness-125 saturate-125"
-            style={{ filter: "drop-shadow(0 0 30px oklch(0.72 0.12 78 / 0.35))" }}
+            className="h-full w-auto max-w-none object-contain opacity-[0.28] mix-blend-multiply dark:opacity-[0.22] dark:mix-blend-screen"
           />
-          <div className="absolute inset-0 hidden md:block">
-            <span className="absolute left-[62%] top-[42%] text-[10px] font-semibold uppercase tracking-[0.15em] text-accent opacity-60">
-              • • Hoàng Sa
-            </span>
-            <span className="absolute left-[58%] top-[64%] text-[10px] font-semibold uppercase tracking-[0.15em] text-accent opacity-60">
-              • • • Trường Sa
-            </span>
-          </div>
+        </div>
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0">
+          <img
+            src={motifs}
+            alt=""
+            width={1536}
+            height={768}
+            loading="lazy"
+            className="w-full opacity-40 dark:opacity-30"
+          />
         </div>
 
-        <div className="relative mx-auto grid max-w-5xl gap-12 px-6 py-20 md:grid-cols-[1.4fr_1fr] md:items-center md:py-28">
+        <div className="relative mx-auto grid max-w-5xl gap-12 px-6 py-20 md:grid-cols-[1.35fr_1fr] md:items-center md:py-28">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent">
-              Modern Heritage Portfolio
+            <p className="inline-block rotate-[-1.5deg] bg-gold px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.28em] text-deepsea">
+              {t.ui.eyebrow}
             </p>
-            <h1 className="mt-4 font-display text-4xl font-extrabold leading-tight tracking-tight text-primary md:text-6xl">
+            <h1 className="mt-5 font-display text-4xl font-black uppercase leading-[1.05] tracking-tight text-primary md:text-6xl">
               {profile.name}
             </h1>
-            <p className="mt-4 font-display text-base font-semibold text-foreground md:text-lg">
-              {profile.role} · GPA {profile.gpa}
+            <p className="mt-4 font-display text-base font-bold text-foreground md:text-lg">
+              {t.ui.role} · GPA {profile.gpa}
             </p>
-            <p className="mt-2 text-sm uppercase tracking-[0.18em] text-accent">{profile.tagline}</p>
+            <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-accent">
+              {t.ui.tagline}
+            </p>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground">
-              {profile.intro}
+              {t.ui.intro}
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -182,51 +254,61 @@ function Portfolio() {
                 href={profile.cvUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-accent"
+                className="inline-flex items-center rounded-full bg-primary px-6 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-transform hover:-translate-y-0.5"
               >
-                Tải CV
+                {t.ui.cv}
               </a>
               <a
                 href="#lien-he"
-                className="inline-flex items-center rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:border-accent hover:text-accent"
+                className="inline-flex items-center rounded-full border-2 border-primary bg-card px-6 py-3 text-sm font-bold uppercase tracking-wide text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
               >
-                Liên hệ
+                {t.ui.contactBtn}
               </a>
+            </div>
+
+            <div className="mt-8 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.15em] text-deepsea">
+              <span className="rounded-full border-2 border-gold bg-card/80 px-3 py-1">
+                ● ● {t.ui.hoangSa}
+              </span>
+              <span className="rounded-full border-2 border-gold bg-card/80 px-3 py-1">
+                ● ● ● {t.ui.truongSa}
+              </span>
             </div>
           </div>
 
           <div className="mx-auto w-full max-w-xs">
-            <div className="rounded-3xl border border-border bg-card/80 p-3 shadow-sm backdrop-blur transition-transform hover:-translate-y-1">
-              <div className="overflow-hidden rounded-2xl border border-border/70 bg-secondary">
+            <div className="rounded-[2rem] border-4 border-primary bg-card p-3 shadow-[8px_8px_0_0_var(--gold)]">
+              <div className="overflow-hidden rounded-[1.5rem] border-2 border-gold bg-secondary">
                 <img
-                  src={profile.avatar}
-                  alt={`Ảnh đại diện của ${profile.name}`}
+                  src={profile.avatar || avatarDefault}
+                  alt={`${profile.name}`}
                   width={640}
                   height={800}
                   className="aspect-[4/5] w-full object-cover"
                 />
               </div>
-              <p className="py-3 text-center text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                HUTECH · IT Student
+              <p className="py-3 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                {t.ui.avatarCaption}
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <Section id="kinh-nghiem" eyebrow="Work Experiences" title="Kinh nghiệm làm việc">
+      <Section
+        id="kinh-nghiem"
+        eyebrow={t.sections.experience.eyebrow}
+        title={t.sections.experience.title}
+      >
         <div className="grid gap-6 md:grid-cols-2">
-          {experiences.map((e) => (
-            <article
-              key={e.org}
-              className="rounded-2xl border border-border bg-card p-6 transition-all hover:-translate-y-1 hover:border-accent"
-            >
-              <h3 className="font-display text-lg font-bold text-primary">{e.role}</h3>
-              <p className="mt-1 text-sm font-medium text-accent">{e.org}</p>
+          {t.experiences.map((e) => (
+            <article key={e.org} className={cardClass}>
+              <h3 className="font-display text-lg font-extrabold text-primary">{e.role}</h3>
+              <p className="mt-1 text-sm font-bold text-accent">{e.org}</p>
               <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
                 {e.details.map((d) => (
                   <li key={d} className="flex gap-2">
-                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-accent" />
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rotate-45 bg-gold" />
                     {d}
                   </li>
                 ))}
@@ -236,27 +318,24 @@ function Portfolio() {
         </div>
       </Section>
 
-      <Section id="du-an" eyebrow="Projects" title="Dự án tiêu biểu">
+      <Section id="du-an" eyebrow={t.sections.projects.eyebrow} title={t.sections.projects.title}>
         <div className="grid gap-6 md:grid-cols-2">
-          {projects.map((p) => (
-            <article
-              key={p.title}
-              className="flex flex-col rounded-2xl border border-border bg-card p-6 transition-all hover:-translate-y-1 hover:border-accent"
-            >
-              <p className="text-xs uppercase tracking-[0.2em] text-accent">{p.role}</p>
-              <h3 className="mt-2 font-display text-lg font-bold leading-snug text-primary">
+          {t.projects.map((p) => (
+            <article key={p.title} className={`flex flex-col ${cardClass}`}>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">{p.role}</p>
+              <h3 className="mt-2 font-display text-lg font-extrabold leading-snug text-primary">
                 {p.title}
               </h3>
               <p className="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
                 {p.description}
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
-                {p.tags.map((t) => (
+                {p.tags.map((tag) => (
                   <span
-                    key={t}
-                    className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground"
+                    key={tag}
+                    className="rounded-full border-2 border-primary/30 px-3 py-1 text-xs font-semibold text-muted-foreground"
                   >
-                    {t}
+                    {tag}
                   </span>
                 ))}
               </div>
@@ -265,14 +344,11 @@ function Portfolio() {
         </div>
       </Section>
 
-      <Section id="ky-nang" eyebrow="Skills" title="Kỹ năng chuyên môn">
+      <Section id="ky-nang" eyebrow={t.sections.skills.eyebrow} title={t.sections.skills.title}>
         <div className="grid gap-6 md:grid-cols-3">
-          {skills.map((s) => (
-            <article
-              key={s.group}
-              className="rounded-2xl border border-border bg-card p-6 transition-all hover:-translate-y-1 hover:border-accent"
-            >
-              <h3 className="font-display text-sm font-bold uppercase tracking-[0.15em] text-primary">
+          {t.skills.map((s) => (
+            <article key={s.group} className={cardClass}>
+              <h3 className="font-display text-sm font-extrabold uppercase tracking-[0.15em] text-primary">
                 {s.group}
               </h3>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
@@ -285,21 +361,25 @@ function Portfolio() {
         </div>
       </Section>
 
-      <Section id="thanh-tich" eyebrow="Achievements" title="Thành tích & Chứng chỉ">
-        <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-          {achievements.map((a) => (
+      <Section
+        id="thanh-tich"
+        eyebrow={t.sections.achievements.eyebrow}
+        title={t.sections.achievements.title}
+      >
+        <ul className="divide-y-2 divide-primary/15 overflow-hidden rounded-xl border-2 border-primary/25 bg-card shadow-[6px_6px_0_0_var(--gold)]">
+          {t.achievements.map((a) => (
             <li
               key={a.title}
               className="flex items-baseline gap-5 px-6 py-5 transition-colors hover:bg-secondary/60"
             >
-              <span className="font-display text-sm font-bold text-accent">{a.year}</span>
+              <span className="font-display text-sm font-extrabold text-accent">{a.year}</span>
               <span className="text-sm text-foreground">{a.title}</span>
             </li>
           ))}
         </ul>
       </Section>
 
-      <Section id="lien-he" eyebrow="Contact" title="Kết nối với mình">
+      <Section id="lien-he" eyebrow={t.sections.contact.eyebrow} title={t.sections.contact.title}>
         <div className="flex flex-wrap gap-3">
           {socials.map((s) => (
             <a
@@ -307,7 +387,7 @@ function Portfolio() {
               href={s.href}
               target={s.href.startsWith("mailto:") ? undefined : "_blank"}
               rel="noopener noreferrer"
-              className="rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium transition-all hover:-translate-y-0.5 hover:border-accent hover:text-accent"
+              className="rounded-full border-2 border-primary/60 bg-card px-5 py-2.5 text-sm font-bold transition-all hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground"
             >
               {s.label}
             </a>
@@ -317,14 +397,14 @@ function Portfolio() {
           href={profile.cvUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-8 inline-flex items-center rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent"
+          className="mt-8 inline-flex items-center rounded-full bg-primary px-6 py-3 text-sm font-bold uppercase tracking-wide text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-transform hover:-translate-y-0.5"
         >
-          Download CV
+          {t.ui.cv}
         </a>
       </Section>
 
-      <footer className="border-t border-border py-10 text-center text-xs tracking-wide text-muted-foreground">
-        © {new Date().getFullYear()} {profile.name} · Modern Heritage Portfolio
+      <footer className="border-t-2 border-primary/30 py-10 text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        © {new Date().getFullYear()} {profile.name} · {t.ui.footer}
       </footer>
     </div>
   );
