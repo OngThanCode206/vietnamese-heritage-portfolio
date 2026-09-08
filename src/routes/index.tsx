@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Moon, Sun, Globe } from "lucide-react";
+import { Moon, Sun, Globe, Square } from "lucide-react";
 import { content, languages, profile, socials, type Lang } from "@/data/portfolioData";
 import mapPoster from "@/assets/viet-map-poster.png";
 import motifs from "@/assets/retro-space-motifs.png";
@@ -9,13 +9,13 @@ import avatarDefault from "@/assets/avatar-default.jpg";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Võ Lê Cao Kỳ — Retro Space Propaganda Portfolio" },
+      { title: "Võ Lê Cao Kỳ — Portfolio" },
       {
         name: "description",
         content:
-          "Portfolio của Võ Lê Cao Kỳ, sinh viên CNTT HUTECH: dự án IoT/AI, Java Spring Boot, thành tích và kinh nghiệm, phong cách tranh cổ động Việt Nam pha vũ trụ retro.",
+          "Portfolio của Võ Lê Cao Kỳ, sinh viên CNTT HUTECH: dự án IoT/AI, Java Spring Boot, thành tích và kinh nghiệm làm việc.",
       },
-      { property: "og:title", content: "Võ Lê Cao Kỳ — Retro Space Propaganda Portfolio" },
+      { property: "og:title", content: "Võ Lê Cao Kỳ — Portfolio" },
       {
         property: "og:description",
         content:
@@ -47,7 +47,7 @@ function useTheme() {
   return { dark, toggle };
 }
 
-function MusicToggle({ on, off }: { on: string; off: string }) {
+function MusicToggle({ on, off, stop }: { on: string; off: string; stop: string }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -78,23 +78,43 @@ function MusicToggle({ on, off }: { on: string; off: string }) {
     }
   };
 
+  const stopPlayback = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+    setPlaying(false);
+  };
+
   return (
-    <button
-      onClick={toggle}
-      aria-label={playing ? on : off}
-      className="inline-flex items-center gap-2 rounded-full border-2 border-primary/70 bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
-    >
-      <span className="flex h-3 items-end gap-[2px]" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="w-[2px] rounded-full bg-current transition-all"
-            style={{ height: playing ? `${6 + i * 3}px` : "4px" }}
-          />
-        ))}
-      </span>
-      <span className="hidden sm:inline">{playing ? on : off}</span>
-    </button>
+    <div className="inline-flex items-center gap-1.5">
+      <button
+        onClick={toggle}
+        aria-label={playing ? on : off}
+        className="inline-flex items-center gap-2 rounded-full border-2 border-primary/70 bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
+      >
+        <span className="flex h-3 items-end gap-[2px]" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-[2px] rounded-full bg-current transition-all"
+              style={{ height: playing ? `${6 + i * 3}px` : "4px" }}
+            />
+          ))}
+        </span>
+        <span className="hidden sm:inline">{playing ? on : off}</span>
+      </button>
+      {playing && (
+        <button
+          onClick={stopPlayback}
+          aria-label={stop}
+          title={stop}
+          className="inline-flex items-center justify-center rounded-full border-2 border-primary/70 bg-card p-1.5 text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          <Square className="h-3 w-3 fill-current" />
+        </button>
+      )}
+    </div>
   );
 }
 
