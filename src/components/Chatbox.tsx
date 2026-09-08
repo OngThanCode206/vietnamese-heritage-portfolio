@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { SYSTEM_INSTRUCTION } from '../config/aiPrompt';
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-
 export const Chatbox: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -20,14 +18,29 @@ export const Chatbox: React.FC = () => {
     setLoading(true);
 
     try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error('Thiếu VITE_GEMINI_API_KEY trong cấu hình!');
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash', // Sửa model tại đây
         contents: userMsg,
         config: { systemInstruction: SYSTEM_INSTRUCTION }
       });
-      setMessages(prev => [...prev, { sender: 'ai', text: response.text || 'Anh/Chị vui lòng liên hệ email nky57412@gmail.com để trao đổi thêm nhé!' }]);
-    } catch {
-      setMessages(prev => [...prev, { sender: 'ai', text: 'Có lỗi kết nối xảy ra. Vui lòng thử lại sau!' }]);
+
+      setMessages(prev => [
+        ...prev, 
+        { sender: 'ai', text: response.text || 'Anh/Chị vui lòng liên hệ email nky57412@gmail.com để trao đổi thêm nhé!' }
+      ]);
+    } catch (error) {
+      console.error('Lỗi gọi Gemini API:', error);
+      setMessages(prev => [
+        ...prev, 
+        { sender: 'ai', text: 'Có lỗi kết nối xảy ra. Vui lòng thử lại sau!' }
+      ]);
     } finally {
       setLoading(false);
     }
