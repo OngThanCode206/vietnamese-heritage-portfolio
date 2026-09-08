@@ -23,16 +23,15 @@ export const Chatbox: React.FC = () => {
         throw new Error('Chưa tìm thấy VITE_GEMINI_API_KEY');
       }
 
-      // Gọi REST API tới endpoint chuẩn v1beta
+      // Đã đổi model sang "gemini-2.0-flash" chuẩn ổn định
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            // Sửa tại đây: camelCase "systemInstruction"
             systemInstruction: {
               parts: [{ text: SYSTEM_INSTRUCTION }]
             },
