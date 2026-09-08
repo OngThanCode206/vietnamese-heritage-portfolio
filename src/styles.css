@@ -19,6 +19,8 @@
  */
 
 @theme inline {
+  --font-display: "Plus Jakarta Sans", "Montserrat", sans-serif;
+  --font-sans: "Be Vietnam Pro", "Inter", sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -26,6 +28,11 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+  --color-bamboo: var(--bamboo);
+  --color-deepsea: var(--deepsea);
+  --color-sand: var(--sand);
+  --color-gold: var(--gold);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
