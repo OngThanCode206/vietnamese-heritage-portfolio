@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import { SYSTEM_INSTRUCTION } from '../config/aiPrompt';
 
 export const Chatbox: React.FC = () => {
@@ -19,28 +18,49 @@ export const Chatbox: React.FC = () => {
 
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      
       if (!apiKey) {
-        throw new Error('Thiếu VITE_GEMINI_API_KEY trong cấu hình!');
+        throw new Error('Chưa tìm thấy VITE_GEMINI_API_KEY');
       }
 
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash', // Sửa model tại đây
-        contents: userMsg,
-        config: { systemInstruction: SYSTEM_INSTRUCTION }
-      });
+      // Gọi REST API trực tiếp tới Gemini 1.5 Flash
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: SYSTEM_INSTRUCTION }]
+            },
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: userMsg }]
+              }
+            ]
+          })
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error('Gemini API Error:', data);
+        throw new Error(data?.error?.message || 'Lỗi API');
+      }
+
+      const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
       setMessages(prev => [
         ...prev, 
-        { sender: 'ai', text: response.text || 'Anh/Chị vui lòng liên hệ email nky57412@gmail.com để trao đổi thêm nhé!' }
+        { sender: 'ai', text: replyText || 'Anh/Chị vui lòng liên hệ email nky57412@gmail.com để trao đổi thêm nhé!' }
       ]);
     } catch (error) {
-      console.error('Lỗi gọi Gemini API:', error);
-      setMessages(prev => [
-        ...prev, 
-        { sender: 'ai', text: 'Có lỗi kết nối xảy ra. Vui lòng thử lại sau!' }
-      ]);
+      console.error('Fetch error:', error);
+      setMessages(prev => [...prev, { sender: 'ai', text: 'Có lỗi kết nối xảy ra. Vui lòng thử lại sau!' }]);
     } finally {
       setLoading(false);
     }
