@@ -41,6 +41,7 @@ type Content = {
     contactBtn: string;
     musicOn: string;
     musicOff: string;
+    musicStop: string;
     light: string;
     dark: string;
     language: string;
@@ -82,6 +83,7 @@ export const content: Record<Lang, Content> = {
       contactBtn: "Liên hệ",
       musicOn: "Đang phát",
       musicOff: "Nhạc nền",
+      musicStop: "Dừng",
       light: "Chế độ sáng",
       dark: "Chế độ tối",
       language: "Ngôn ngữ",
@@ -176,6 +178,7 @@ export const content: Record<Lang, Content> = {
       contactBtn: "Contact",
       musicOn: "Playing",
       musicOff: "Music",
+      musicStop: "Stop",
       light: "Light mode",
       dark: "Dark mode",
       language: "Language",
@@ -270,6 +273,7 @@ export const content: Record<Lang, Content> = {
       contactBtn: "연락하기",
       musicOn: "재생 중",
       musicOff: "배경 음악",
+      musicStop: "정지",
       light: "라이트 모드",
       dark: "다크 모드",
       language: "언어",
