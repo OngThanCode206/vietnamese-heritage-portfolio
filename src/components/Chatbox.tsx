@@ -63,6 +63,19 @@ export function Chatbox() {
     return `${day}/${month}/${year}`;
   };
 
+  const parseAndAppendChunk = (line: string): string => {
+    const cleanLine = line.replace(/\r$/, "").trim();
+    if (!cleanLine.startsWith("data: ")) return "";
+    const jsonStr = cleanLine.replace(/^data:\s*/, "").trim();
+    if (jsonStr === "[DONE]") return "";
+    try {
+      const data = JSON.parse(jsonStr);
+      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch {
+      return "";
+    }
+  };
+
   const handleSend = async (textToSend?: string) => {
     const query = textToSend || input;
     if (!query.trim() || isLoading) return;
@@ -108,9 +121,9 @@ export function Chatbox() {
         throw new Error("Missing VITE_GEMINI_API_KEY in .env");
       }
 
-      // Đã cập nhật sang model gemini-3.6-flash theo yêu cầu mới nhất từ API
+      // Sử dụng streamGenerateContent với alt=sse để chữ hiện ra ngay lập tức mượt mà
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -133,23 +146,53 @@ export function Chatbox() {
         throw new Error(`HTTP Error: ${response.status}`);
       }
 
-      const data = await response.json();
-      const replyText =
-        data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-        "Dạ em không nhận được phản hồi từ hệ thống.";
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = "";
 
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === aiMsgId ? { ...msg, text: replyText } : msg))
-      );
+      if (reader) {
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            if (buffer.trim()) {
+              accumulatedText += parseAndAppendChunk(buffer.trim());
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
+                )
+              );
+            }
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const chunkText = parseAndAppendChunk(line);
+            if (chunkText) {
+              accumulatedText += chunkText;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
+                )
+              );
+            }
+          }
+        }
+      }
     } catch (error) {
-      console.error("Chatbox API Error:", error);
+      console.error("Chatbox Stream Error:", error);
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMsgId
             ? {
                 ...msg,
                 text:
-                  "Dạ em rất tiếc, kết nối trực tuyến hiện đang gián đoạn. Anh/Chị có thể liên hệ trực tiếp với anh Kỳ qua Email **nky57412@gmail.com** hoặc SĐT **0369 623 216** nhé ạ!",
+                  "Dạ em rất tiếc, kết nối hiện đang gián đoạn một chút. Anh/Chị có thể liên hệ trực tiếp với anh Kỳ qua Email **nky57412@gmail.com** hoặc SĐT **0369 623 216** nhé ạ!",
               }
             : msg
         )
@@ -194,7 +237,7 @@ export function Chatbox() {
                 </h3>
                 <p className="mt-1 flex items-center gap-1 text-[10px] opacity-90">
                   <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                  Đang hoạt động (Gemini 3.6)
+                  Đang hoạt động
                 </p>
               </div>
             </div>
