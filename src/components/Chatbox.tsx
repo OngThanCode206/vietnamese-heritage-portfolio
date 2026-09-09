@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Send, Bot, User, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { SYSTEM_INSTRUCTION } from "../config/aiPrompt";
 
 interface Message {
   id: string;
@@ -9,11 +10,10 @@ interface Message {
   timestamp: string;
 }
 
-const SUGGESTIONS = [
-  "Kỳ có những kỹ năng gì?",
+const INITIAL_SUGGESTIONS = [
+  "Kỳ đang làm vị trí gì?",
   "Dự án tiêu biểu của Kỳ?",
-  "Kinh nghiệm làm việc thế nào?",
-  "Kỳ là sinh viên trường nào?",
+  "Thành tích & Học vấn của Kỳ?",
 ];
 
 export function Chatbox() {
@@ -26,14 +26,14 @@ export function Chatbox() {
     {
       id: "welcome",
       sender: "ai",
-      text: "Xin chào! Mình là trợ lý AI của **Võ Lê Cao Kỳ**. Bạn có thể hỏi mình bằng **Tiếng Việt**, **English**, hoặc **한국어** nhé! 👋",
+      text: "Dạ em xin chào Anh/Chị! Em là **Trợ lý ảo CKy** — đại diện thông tin cho **Võ Lê Cao Kỳ**. Anh/Chị cần em hỗ trợ tìm hiểu về học vấn, kinh nghiệm làm việc hay các dự án của Kỳ ạ? 👋\n\n💡 **Anh/Chị có thể chọn nhanh các gợi ý bên dưới:**",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Cập nhật đồng hồ thời gian thực mỗi giây
+  // Đồng hồ thời gian thực
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -41,14 +41,13 @@ export function Chatbox() {
     return () => clearInterval(timer);
   }, []);
 
-  // Tự động cuộn xuống tin nhắn mới nhất
+  // Cuộn tự động xuống tin nhắn mới
   useEffect(() => {
     if (isOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isOpen]);
 
-  // Định dạng Giờ: 5:46 pm
   const formatLiveTime = (date: Date) => {
     return date
       .toLocaleTimeString("en-US", {
@@ -59,7 +58,6 @@ export function Chatbox() {
       .toLowerCase();
   };
 
-  // Định dạng Ngày: 09/09/2026
   const formatLiveDate = (date: Date) => {
     const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -67,7 +65,6 @@ export function Chatbox() {
     return `${day}/${month}/${year}`;
   };
 
-  // Hàm gọi trực tiếp Gemini 3.6 Flash API
   const handleSend = async (textToSend?: string) => {
     const query = textToSend || input;
     if (!query.trim() || isLoading) return;
@@ -87,10 +84,9 @@ export function Chatbox() {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
       if (!apiKey) {
-        throw new Error("Missing VITE_GEMINI_API_KEY in environment variables");
+        throw new Error("Missing VITE_GEMINI_API_KEY");
       }
 
-      // Gọi phiên bản Gemini 3.6 Flash
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
@@ -102,27 +98,20 @@ export function Chatbox() {
                 role: "user",
                 parts: [
                   {
-                    text: `You are the personal AI assistant for Võ Lê Cao Kỳ's portfolio website.
-Kỳ is an IT student at HUTECH University (GPA 3.42/4.0), aiming to be an AI/IoT Engineer & Java Web Developer.
-Key skills: Java Spring Boot, React, TypeScript, Python (AI/IoT), SQL, Git.
-Key projects: IoT Smart Home, AI Image Processing, Java Spring Boot Web APIs.
-
-INSTRUCTION:
-1. Detect user's language (Vietnamese, English, or Korean).
-2. Answer accurately in that EXACT language using clean Markdown formatting.
-3. Keep the answer friendly, professional, and concise (under 4 sentences).
-
-User Question: "${query.trim()}"`,
+                    text: `${SYSTEM_INSTRUCTION}\n\nCâu hỏi từ Anh/Chị: "${query.trim()}"`,
                   },
                 ],
               },
             ],
+            generationConfig: {
+              temperature: 0.3,
+            },
           }),
         }
       );
 
       if (!response.ok) {
-        throw new Error(`API HTTP Error Status: ${response.status}`);
+        throw new Error(`HTTP Error: ${response.status}`);
       }
 
       const data = await response.json();
@@ -131,16 +120,16 @@ User Question: "${query.trim()}"`,
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: "ai",
-        text: replyText || "Cảm ơn bạn đã nhắn tin!",
+        text: replyText || "Dạ em cảm ơn Anh/Chị đã nhắn tin ạ!",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, aiMsg]);
     } catch (error) {
-      console.error("Gemini 3.6 API Error:", error);
+      console.error("Chatbox API Error:", error);
       const fallbackMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: "ai",
-        text: "Cảm ơn bạn đã quan tâm! Bạn có thể liên hệ trực tiếp với Kỳ qua Email hoặc các liên kết mạng xã hội bên dưới nhé.",
+        text: "Dạ em rất tiếc, kết nối hiện đang gián đoạn một chút. Anh/Chị có thể liên hệ trực tiếp với anh Kỳ qua Email **nky57412@gmail.com** hoặc SĐT **0369 623 216** nhé ạ!\n\n💡 **Anh/Chị có muốn tìm hiểu về các dự án tiêu biểu của Kỳ không ạ?**",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, fallbackMsg]);
@@ -151,11 +140,11 @@ User Question: "${query.trim()}"`,
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
-      {/* 1. Đám mây thông báo "Trợ lý ảo" */}
+      {/* 1. Đám mây thông báo khi đóng chatbox */}
       {showCloud && !isOpen && (
         <div className="relative mb-2 flex items-center gap-1.5 rounded-2xl border-2 border-primary/40 bg-card px-3 py-1.5 shadow-[4px_4px_0_0_var(--gold)] text-xs font-bold text-primary animate-bounce">
           <Sparkles className="h-3.5 w-3.5 text-gold" />
-          <span>Trợ lý ảo</span>
+          <span>Trợ lý ảo CKy</span>
           <button
             type="button"
             onClick={(e) => {
@@ -171,7 +160,7 @@ User Question: "${query.trim()}"`,
         </div>
       )}
 
-      {/* 2. Cửa sổ Chatbox */}
+      {/* 2. Khung Chatbox */}
       {isOpen && (
         <div className="mb-2 flex h-[520px] w-[350px] sm:w-[390px] flex-col overflow-hidden rounded-2xl border-2 border-primary/40 bg-card/95 backdrop-blur-md shadow-[8px_8px_0_0_var(--gold)] transition-all animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
@@ -179,13 +168,16 @@ User Question: "${query.trim()}"`,
             <div className="flex items-center gap-2.5">
               <div className="relative flex h-8 w-8 items-center justify-center rounded-full border border-gold bg-card text-primary">
                 <Bot className="h-4 w-4" />
-                <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-2 ring-card" />
+                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card animate-pulse" />
               </div>
               <div>
                 <h3 className="font-display text-sm font-extrabold leading-none tracking-wide text-primary-foreground">
-                  Kỳ AI Assistant
+                  Trợ lý ảo CKy
                 </h3>
-                <p className="mt-1 text-[10px] opacity-80">Gemini 3.6 Flash Powered</p>
+                <p className="mt-1 flex items-center gap-1 text-[10px] opacity-90">
+                  <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                  Đang hoạt động
+                </p>
               </div>
             </div>
             <button
@@ -216,7 +208,7 @@ User Question: "${query.trim()}"`,
                   {m.sender === "user" ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
                 </div>
                 <div
-                  className={`group relative max-w-[80%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                  className={`group relative max-w-[82%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
                     m.sender === "user"
                       ? "bg-primary text-primary-foreground rounded-tr-none shadow-sm"
                       : "bg-secondary/90 border border-primary/20 text-foreground rounded-tl-none shadow-sm"
@@ -238,13 +230,14 @@ User Question: "${query.trim()}"`,
               </div>
             ))}
 
-            {/* Đang gõ / Đang kết nối AI */}
+            {/* Trạng thái Đang xử lý */}
             {isLoading && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gold bg-accent">
                   <Bot className="h-3.5 w-3.5 text-accent-foreground" />
                 </div>
-                <div className="flex gap-1.5 rounded-2xl rounded-tl-none border border-primary/20 bg-secondary/80 px-4 py-3">
+                <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-primary/20 bg-secondary/80 px-4 py-2.5">
+                  <span className="text-[11px] font-medium text-muted-foreground mr-1">CKy đang xử lý</span>
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.2s]" />
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.4s]" />
@@ -254,10 +247,10 @@ User Question: "${query.trim()}"`,
             <div ref={chatEndRef} />
           </div>
 
-          {/* Câu hỏi gợi ý nhanh */}
-          {messages.length <= 2 && (
+          {/* Gợi ý nhanh ban đầu */}
+          {messages.length <= 1 && (
             <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-              {SUGGESTIONS.map((s) => (
+              {INITIAL_SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -271,7 +264,7 @@ User Question: "${query.trim()}"`,
             </div>
           )}
 
-          {/* Ô Nhập văn bản */}
+          {/* Ô Nhập tin nhắn */}
           <div className="border-t-2 border-primary/20 bg-card p-3">
             <form
               onSubmit={(e) => {
@@ -284,7 +277,7 @@ User Question: "${query.trim()}"`,
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Nhập câu hỏi... (Ask in English / 한국어)"
+                placeholder="Hỏi trợ lý CKy bất kỳ thông tin nào..."
                 className="flex-1 rounded-xl border border-primary/30 bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <button
@@ -299,7 +292,7 @@ User Question: "${query.trim()}"`,
         </div>
       )}
 
-      {/* 3. Nút tròn mở/đóng Chatbox */}
+      {/* 3. Nút mở/đóng Chatbox */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -309,7 +302,7 @@ User Question: "${query.trim()}"`,
         {isOpen ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6 transition-transform group-hover:rotate-12" />}
       </button>
 
-      {/* 4. Thanh hiển thị thời gian thực phía dưới Chatbox */}
+      {/* 4. Đồng hồ thời gian thực */}
       <div className="mt-2 flex flex-col items-center rounded-lg border border-primary/20 bg-card/90 px-2.5 py-1 text-center font-mono shadow-sm backdrop-blur-sm">
         <span className="text-[11px] font-bold text-foreground leading-none">
           {formatLiveTime(currentTime)}
