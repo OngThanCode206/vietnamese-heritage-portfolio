@@ -1,11 +1,37 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Moon, Sun, Globe, Square } from "lucide-react";
+import {
+  Moon,
+  Sun,
+  Globe,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  Music,
+} from "lucide-react";
 import { content, languages, profile, socials, type Lang } from "@/data/portfolioData";
 import mapPoster from "@/assets/viet-map-poster.png";
 import motifs from "@/assets/retro-space-motifs.png";
 import avatarDefault from "@/assets/avatar-default.jpg";
 import { Chatbox } from "../components/Chatbox";
+
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
+// Danh sách 4 bài nhạc YouTube bạn chọn
+const PLAYLIST = [
+  { title: "Die With A Smile", id: "kPa7bsKwL-c" },
+  { title: "Hello Em Có Khỏe Không 👽", id: "Q4cDgcvPBG4" },
+  { title: "Xương Rồng", id: "4jjOH2FR6-E" },
+  { title: "Bao Tiền Một Mớ Bình Yên?", id: "vVhKA9Av6vA" },
+];
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -51,57 +77,156 @@ function useTheme() {
   return { dark, toggle };
 }
 
-function MusicToggle({ on, off, stop }: { on: string; off: string; stop: string }) {
-  const [playing, setPlaying] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const youtubeVideoId = "-nJ0WHEetsQ";
+function MusicPlayer() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  // URL nhúng YouTube chuẩn cho Autoplay + Loop
-  const audioSrc = `https://www.youtube.com/embed/${youtubeVideoId}?enablejsapi=1&autoplay=1&mute=0&loop=1&playlist=${youtubeVideoId}`;
+  const playerRef = useRef<any>(null);
+  const currentTrack = PLAYLIST[currentIndex];
 
   useEffect(() => {
-    // Thử tự bật nhạc khi vừa tải trang
-    setPlaying(true);
-
-    // Kích hoạt phát nhạc khi có tương tác đầu tiên nếu trình duyệt chặn autoplay ban đầu
-    const handleFirstInteraction = () => {
-      setPlaying(true);
-      window.removeEventListener("click", handleFirstInteraction);
-      window.removeEventListener("touchstart", handleFirstInteraction);
-      window.removeEventListener("scroll", handleFirstInteraction);
+    const initPlayer = () => {
+      if (playerRef.current) return;
+      playerRef.current = new window.YT.Player("yt-audio-element", {
+        height: "0",
+        width: "0",
+        videoId: PLAYLIST[0].id,
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+        },
+        events: {
+          onReady: (e: any) => {
+            setIsReady(true);
+            setDuration(e.target.getDuration() || 0);
+          },
+          onStateChange: (e: any) => {
+            if (e.data === 0) {
+              handleNext();
+            }
+          },
+        },
+      });
     };
 
-    window.addEventListener("click", handleFirstInteraction);
-    window.addEventListener("touchstart", handleFirstInteraction);
-    window.addEventListener("scroll", handleFirstInteraction);
-
-    return () => {
-      window.removeEventListener("click", handleFirstInteraction);
-      window.removeEventListener("touchstart", handleFirstInteraction);
-      window.removeEventListener("scroll", handleFirstInteraction);
-    };
+    if (!window.YT) {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName("script")[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+      window.onYouTubeIframeAPIReady = initPlayer;
+    } else {
+      initPlayer();
+    }
   }, []);
 
-  const toggle = () => setPlaying((prev) => !prev);
-  const stopPlayback = () => setPlaying(false);
+  useEffect(() => {
+    const startAudioOnInteraction = () => {
+      if (playerRef.current && playerRef.current.playVideo && !isPlaying) {
+        playerRef.current.playVideo();
+        setIsPlaying(true);
+      }
+      window.removeEventListener("click", startAudioOnInteraction);
+      window.removeEventListener("touchstart", startAudioOnInteraction);
+      window.removeEventListener("scroll", startAudioOnInteraction);
+      window.removeEventListener("keydown", startAudioOnInteraction);
+    };
+
+    window.addEventListener("click", startAudioOnInteraction);
+    window.addEventListener("touchstart", startAudioOnInteraction);
+    window.addEventListener("scroll", startAudioOnInteraction);
+    window.addEventListener("keydown", startAudioOnInteraction);
+
+    return () => {
+      window.removeEventListener("click", startAudioOnInteraction);
+      window.removeEventListener("touchstart", startAudioOnInteraction);
+      window.removeEventListener("scroll", startAudioOnInteraction);
+      window.removeEventListener("keydown", startAudioOnInteraction);
+    };
+  }, [isReady]);
+
+  useEffect(() => {
+    let interval: any;
+    if (isPlaying && playerRef.current) {
+      interval = setInterval(() => {
+        if (playerRef.current.getCurrentTime) {
+          setCurrentTime(playerRef.current.getCurrentTime() || 0);
+          setDuration(playerRef.current.getDuration() || 0);
+        }
+      }, 500);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (playerRef.current && playerRef.current.loadVideoById) {
+      playerRef.current.loadVideoById(PLAYLIST[currentIndex].id);
+      if (isPlaying) {
+        playerRef.current.playVideo();
+      }
+    }
+  }, [currentIndex]);
+
+  const togglePlay = () => {
+    if (!playerRef.current) return;
+    if (isPlaying) {
+      playerRef.current.pauseVideo();
+      setIsPlaying(false);
+    } else {
+      playerRef.current.playVideo();
+      setIsPlaying(true);
+    }
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % PLAYLIST.length);
+  };
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + PLAYLIST.length) % PLAYLIST.length);
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = Number(e.target.value);
+    if (playerRef.current && playerRef.current.seekTo) {
+      playerRef.current.seekTo(newTime, true);
+      setCurrentTime(newTime);
+    }
+  };
+
+  const toggleMute = () => {
+    if (!playerRef.current) return;
+    if (isMuted) {
+      playerRef.current.unMute();
+      setIsMuted(false);
+    } else {
+      playerRef.current.mute();
+      setIsMuted(true);
+    }
+  };
+
+  const formatTime = (time: number) => {
+    if (isNaN(time)) return "00:00";
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins < 10 ? "0" : ""}${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
 
   return (
-    <div className="inline-flex items-center gap-1.5">
-      {/* Nạp Iframe YouTube */}
-      <iframe
-        ref={iframeRef}
-        width="0"
-        height="0"
-        src={playing ? audioSrc : ""}
-        title="Background Music"
-        allow="autoplay"
-        className="hidden"
-      />
+    <div className="relative inline-block">
+      <div id="yt-audio-element" className="hidden" />
 
+      {/* Nút bật/tắt & mở trình điều khiển nhạc ở Header */}
       <button
         type="button"
-        onClick={toggle}
-        aria-label={playing ? on : off}
+        onClick={() => setIsOpen((prev) => !prev)}
         className="inline-flex items-center gap-2 rounded-full border-2 border-primary/70 bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <span className="flex h-3 items-end gap-[2px]" aria-hidden>
@@ -109,23 +234,83 @@ function MusicToggle({ on, off, stop }: { on: string; off: string; stop: string 
             <span
               key={i}
               className="w-[2px] rounded-full bg-current transition-all"
-              style={{ height: playing ? `${6 + i * 3}px` : "4px" }}
+              style={{ height: isPlaying ? `${6 + i * 3}px` : "4px" }}
             />
           ))}
         </span>
-        <span className="hidden sm:inline">{playing ? on : off}</span>
+        <Music className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline truncate max-w-[100px]">{currentTrack.title}</span>
       </button>
 
-      {playing && (
-        <button
-          type="button"
-          onClick={stopPlayback}
-          aria-label={stop}
-          title={stop}
-          className="inline-flex items-center justify-center rounded-full border-2 border-primary/70 bg-card p-1.5 text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
-        >
-          <Square className="h-3 w-3 fill-current" />
-        </button>
+      {/* Bảng Popover điều khiển nhạc đầy đủ */}
+      {isOpen && (
+        <div className="absolute right-0 top-11 z-50 w-72 rounded-2xl border-2 border-primary/40 bg-card/95 p-3.5 shadow-[6px_6px_0_0_var(--gold)] backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between font-bold text-primary">
+            <span className="truncate text-xs">{currentTrack.title}</span>
+            <span className="ml-1 text-[10px] text-muted-foreground shrink-0">
+              {currentIndex + 1}/{PLAYLIST.length}
+            </span>
+          </div>
+
+          {/* Thanh thời gian (Seek Bar) */}
+          <div className="mt-2 flex items-center gap-2">
+            <span className="w-8 text-[10px] font-mono text-muted-foreground">
+              {formatTime(currentTime)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={duration || 0}
+              value={currentTime}
+              onChange={handleSeek}
+              className="h-1.5 flex-1 cursor-pointer appearance-none rounded-lg bg-primary/20 accent-primary"
+            />
+            <span className="w-8 text-[10px] font-mono text-muted-foreground">
+              {formatTime(duration)}
+            </span>
+          </div>
+
+          {/* Bộ nút điều khiển */}
+          <div className="mt-2 flex items-center justify-between pt-1 border-t border-primary/10">
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="p-1 text-primary hover:text-accent transition-colors"
+              title={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
+            >
+              {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePrev}
+                className="p-1 text-primary hover:text-accent transition-colors"
+                title="Bài trước"
+              >
+                <SkipBack className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={togglePlay}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-105 transition-transform"
+                title={isPlaying ? "Tạm dừng" : "Phát"}
+              >
+                {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleNext}
+                className="p-1 text-primary hover:text-accent transition-colors"
+                title="Bài tiếp"
+              >
+                <SkipForward className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -239,7 +424,8 @@ function Portfolio() {
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
-            <MusicToggle on={t.ui.musicOn} off={t.ui.musicOff} stop={t.ui.musicOff} />
+            {/* Trình phát nhạc mới thay thế cho MusicToggle cũ */}
+            <MusicPlayer />
           </div>
         </div>
       </header>
