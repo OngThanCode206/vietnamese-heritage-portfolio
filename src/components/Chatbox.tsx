@@ -11,7 +11,7 @@ interface Message {
 }
 
 const INITIAL_SUGGESTIONS = [
-  "Kỳ đang làm vị trí gì?",
+  "Kỳ đang học năm mấy?",
   "Dự án tiêu biểu của Kỳ?",
   "Thành tích & Học vấn của Kỳ?",
 ];
@@ -26,7 +26,7 @@ export function Chatbox() {
     {
       id: "welcome",
       sender: "ai",
-      text: "Dạ em xin chào Anh/Chị! Em là **Trợ lý ảo CKy** — đại diện thông tin cho **Võ Lê Cao Kỳ**. Anh/Chị cần em hỗ trợ tìm hiểu về học vấn, kinh nghiệm làm việc hay các dự án của Kỳ ạ? 👋\n\n💡 **Anh/Chị có thể chọn nhanh các gợi ý bên dưới:**",
+      text: "Dạ em xin chào Anh/Chị! Em là **Trợ lý ảo CKy** — đại diện thông tin cho **Võ Lê Cao Kỳ**. Anh/Chị cần em hỗ trợ thông tin gì về học vấn, kinh nghiệm hay dự án của Kỳ ạ? 👋",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
@@ -96,7 +96,7 @@ export function Chatbox() {
         throw new Error("Missing VITE_GEMINI_API_KEY");
       }
 
-      // Gọi endpoint streamGenerateContent với alt=sse để nhận phản hồi theo dạng dòng (Stream)
+      // Gọi endpoint streamGenerateContent với alt=sse
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
         {
@@ -114,7 +114,8 @@ export function Chatbox() {
               },
             ],
             generationConfig: {
-              temperature: 0.3,
+              temperature: 0.1, // Giảm độ biến thiên để trả lời ngắn, chính xác
+              maxOutputTokens: 200, // Khống chế độ dài tối đa giúp tăng tốc độ phản hồi & tiết kiệm token
             },
           }),
         }
@@ -136,7 +137,7 @@ export function Chatbox() {
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Giữ lại dòng chưa hoàn chỉnh cuối cùng
+          buffer = lines.pop() || "";
 
           for (const line of lines) {
             if (line.startsWith("data: ")) {
@@ -147,7 +148,6 @@ export function Chatbox() {
                 const chunkText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (chunkText) {
                   accumulatedText += chunkText;
-                  // Cập nhật lại tin nhắn AI realtime khi từng mảnh chữ chạy về
                   setMessages((prev) =>
                     prev.map((msg) =>
                       msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
@@ -155,7 +155,7 @@ export function Chatbox() {
                   );
                 }
               } catch {
-                // Bỏ qua nếu dòng JSON chưa nhận đủ dữ liệu
+                // Bỏ qua JSON dở dang
               }
             }
           }
@@ -233,7 +233,6 @@ export function Chatbox() {
           {/* Danh sách Tin nhắn */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((m) => {
-              // Bỏ qua hiển thị khung trống khi AI chưa nhận được từ nào
               if (m.sender === "ai" && !m.text && isLoading) return null;
 
               return (
