@@ -12,7 +12,7 @@ interface Message {
 const SUGGESTIONS = [
   "Kỳ có những kỹ năng gì?",
   "Dự án tiêu biểu của Kỳ?",
-  "Kinh nghiệm làm việc thế nào?"
+  "Kinh nghiệm làm việc thế nào?",
   "Kỳ là sinh viên trường nào?",
 ];
 
