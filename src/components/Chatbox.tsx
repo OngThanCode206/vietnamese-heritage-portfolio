@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, X, Send, Bot, User, Sparkles } from "lucide-react";
+import { X, Send, Bot, User, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 interface Message {
@@ -12,30 +12,62 @@ interface Message {
 const SUGGESTIONS = [
   "Kỳ có những kỹ năng gì?",
   "Dự án tiêu biểu của Kỳ?",
-  "Kinh nghiệm làm việc thế nào?",
+  "Kinh nghiệm làm việc thế nào?"
+  "Kỳ là sinh viên trường nào?",
 ];
 
 export function Chatbox() {
   const [isOpen, setIsOpen] = useState(false);
+  const [showCloud, setShowCloud] = useState(true);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       sender: "ai",
-      text: "Xin chào! Mình là trợ lý AI của **Võ Lê Cao Kỳ**. Bạn có muốn tìm hiểu thông tin gì về Kỳ không?",
+      text: "Xin chào! Mình là trợ lý AI của **Võ Lê Cao Kỳ**. Bạn có thể hỏi mình bằng **Tiếng Việt**, **English**, hoặc **한국어** nhé! 👋",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Cập nhật đồng hồ thời gian thực mỗi giây
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Tự động cuộn xuống tin nhắn mới nhất
   useEffect(() => {
     if (isOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isOpen]);
 
+  // Định dạng Giờ: 5:46 pm
+  const formatLiveTime = (date: Date) => {
+    return date
+      .toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+      .toLowerCase();
+  };
+
+  // Định dạng Ngày: 09/09/2026
+  const formatLiveDate = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Hàm gọi trực tiếp Gemini 3.6 Flash API
   const handleSend = async (textToSend?: string) => {
     const query = textToSend || input;
     if (!query.trim() || isLoading) return;
@@ -43,7 +75,7 @@ export function Chatbox() {
     const userMsg: Message = {
       id: Date.now().toString(),
       sender: "user",
-      text: query,
+      text: query.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
@@ -52,21 +84,59 @@ export function Chatbox() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: query }),
-      });
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+      if (!apiKey) {
+        throw new Error("Missing VITE_GEMINI_API_KEY in environment variables");
+      }
+
+      // Gọi phiên bản Gemini 3.6 Flash
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: `You are the personal AI assistant for Võ Lê Cao Kỳ's portfolio website.
+Kỳ is an IT student at HUTECH University (GPA 3.42/4.0), aiming to be an AI/IoT Engineer & Java Web Developer.
+Key skills: Java Spring Boot, React, TypeScript, Python (AI/IoT), SQL, Git.
+Key projects: IoT Smart Home, AI Image Processing, Java Spring Boot Web APIs.
+
+INSTRUCTION:
+1. Detect user's language (Vietnamese, English, or Korean).
+2. Answer accurately in that EXACT language using clean Markdown formatting.
+3. Keep the answer friendly, professional, and concise (under 4 sentences).
+
+User Question: "${query.trim()}"`,
+                  },
+                ],
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`API HTTP Error Status: ${response.status}`);
+      }
+
       const data = await response.json();
+      const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: "ai",
-        text: data.reply || "Cảm ơn bạn đã nhắn tin!",
+        text: replyText || "Cảm ơn bạn đã nhắn tin!",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, aiMsg]);
-    } catch {
+    } catch (error) {
+      console.error("Gemini 3.6 API Error:", error);
       const fallbackMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: "ai",
@@ -80,26 +150,30 @@ export function Chatbox() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
-      {/* Nút Bật Chatbox */}
-      {!isOpen && (
-        <button
-          type="button"
-          onClick={() => setIsOpen(true)}
-          className="group relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-all duration-300 hover:scale-110 hover:shadow-[6px_6px_0_0_var(--gold)] active:scale-95"
-          aria-label="Open Chat"
-        >
-          <Bot className="h-6 w-6 transition-transform group-hover:rotate-12" />
-          <span className="absolute -right-1 -top-1 flex h-4 w-4">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold opacity-75"></span>
-            <span className="relative inline-flex h-4 w-4 rounded-full bg-gold"></span>
-          </span>
-        </button>
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
+      {/* 1. Đám mây thông báo "Trợ lý ảo" */}
+      {showCloud && !isOpen && (
+        <div className="relative mb-2 flex items-center gap-1.5 rounded-2xl border-2 border-primary/40 bg-card px-3 py-1.5 shadow-[4px_4px_0_0_var(--gold)] text-xs font-bold text-primary animate-bounce">
+          <Sparkles className="h-3.5 w-3.5 text-gold" />
+          <span>Trợ lý ảo</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowCloud(false);
+            }}
+            title="Đóng"
+            className="ml-1 rounded-full p-0.5 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-3 w-3" />
+          </button>
+          <div className="absolute -bottom-2 right-5 h-0 w-0 border-x-8 border-x-transparent border-t-8 border-t-card" />
+        </div>
       )}
 
-      {/* Cửa sổ Chatbox */}
+      {/* 2. Cửa sổ Chatbox */}
       {isOpen && (
-        <div className="flex h-[520px] w-[350px] sm:w-[390px] flex-col overflow-hidden rounded-2xl border-2 border-primary/40 bg-card/95 backdrop-blur-md shadow-[8px_8px_0_0_var(--gold)] transition-all animate-in fade-in zoom-in-95 duration-200">
+        <div className="mb-2 flex h-[520px] w-[350px] sm:w-[390px] flex-col overflow-hidden rounded-2xl border-2 border-primary/40 bg-card/95 backdrop-blur-md shadow-[8px_8px_0_0_var(--gold)] transition-all animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="flex items-center justify-between border-b-2 border-primary/20 bg-primary px-4 py-3 text-primary-foreground">
             <div className="flex items-center gap-2.5">
@@ -111,7 +185,7 @@ export function Chatbox() {
                 <h3 className="font-display text-sm font-extrabold leading-none tracking-wide text-primary-foreground">
                   Kỳ AI Assistant
                 </h3>
-                <p className="mt-1 text-[10px] opacity-80">Trợ lý Portfolio thông minh</p>
+                <p className="mt-1 text-[10px] opacity-80">Gemini 3.6 Flash Powered</p>
               </div>
             </div>
             <button
@@ -153,7 +227,9 @@ export function Chatbox() {
                   </div>
                   <span
                     className={`mt-1 block text-[9px] opacity-60 ${
-                      m.sender === "user" ? "text-right text-primary-foreground/70" : "text-left text-muted-foreground"
+                      m.sender === "user"
+                        ? "text-right text-primary-foreground/70"
+                        : "text-left text-muted-foreground"
                     }`}
                   >
                     {m.timestamp}
@@ -162,7 +238,7 @@ export function Chatbox() {
               </div>
             ))}
 
-            {/* Đang gõ (Loading) */}
+            {/* Đang gõ / Đang kết nối AI */}
             {isLoading && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gold bg-accent">
@@ -208,7 +284,7 @@ export function Chatbox() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Nhập câu hỏi..."
+                placeholder="Nhập câu hỏi... (Ask in English / 한국어)"
                 className="flex-1 rounded-xl border border-primary/30 bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <button
@@ -222,6 +298,26 @@ export function Chatbox() {
           </div>
         </div>
       )}
+
+      {/* 3. Nút tròn mở/đóng Chatbox */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="group relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-all duration-300 hover:scale-105 active:scale-95"
+        aria-label="Toggle Chat"
+      >
+        {isOpen ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6 transition-transform group-hover:rotate-12" />}
+      </button>
+
+      {/* 4. Thanh hiển thị thời gian thực phía dưới Chatbox */}
+      <div className="mt-2 flex flex-col items-center rounded-lg border border-primary/20 bg-card/90 px-2.5 py-1 text-center font-mono shadow-sm backdrop-blur-sm">
+        <span className="text-[11px] font-bold text-foreground leading-none">
+          {formatLiveTime(currentTime)}
+        </span>
+        <span className="mt-0.5 text-[10px] text-muted-foreground leading-none">
+          {formatLiveDate(currentTime)}
+        </span>
+      </div>
     </div>
   );
 }
