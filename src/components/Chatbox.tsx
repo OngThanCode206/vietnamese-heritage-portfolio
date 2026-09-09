@@ -108,9 +108,9 @@ export function Chatbox() {
         throw new Error("Missing VITE_GEMINI_API_KEY in .env");
       }
 
-      // Gọi trực tiếp REST API của Gemini 2.0 Flash qua HTTPS trực tuyến
+      // Đã cập nhật sang model gemini-3.6-flash theo yêu cầu mới nhất từ API
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -194,7 +194,7 @@ export function Chatbox() {
                 </h3>
                 <p className="mt-1 flex items-center gap-1 text-[10px] opacity-90">
                   <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                  Đang hoạt động (Online API)
+                  Đang hoạt động (Gemini 3.6)
                 </p>
               </div>
             </div>
