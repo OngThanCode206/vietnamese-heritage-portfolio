@@ -11,9 +11,13 @@ interface Message {
 }
 
 const INITIAL_SUGGESTIONS = [
-  "Kỳ đang học năm mấy?",
+  "Kỳ đang làm vị trí gì?",
   "Dự án tiêu biểu của Kỳ?",
   "Thành tích & Học vấn của Kỳ?",
+  "Kỳ đang học ở đâu?",
+  "Kỳ hiện tại đang làm dự án gì?",
+  "Kỳ sống ở đâu?",
+  "Bạn được ai làm ra?",
 ];
 
 export function Chatbox() {
@@ -26,14 +30,13 @@ export function Chatbox() {
     {
       id: "welcome",
       sender: "ai",
-      text: "Dạ em xin chào Anh/Chị! Em là **Trợ lý ảo CKy** — đại diện thông tin cho **Võ Lê Cao Kỳ**. Anh/Chị cần em hỗ trợ thông tin gì về học vấn, kinh nghiệm hay dự án của Kỳ ạ? 👋",
+      text: "Dạ em xin chào Anh/Chị! Em là **Trợ lý ảo CKy** — đại diện thông tin cho **Võ Lê Cao Kỳ**. Anh/Chị cần em hỗ trợ thông tin gì về học vấn, kinh nghiệm hay các dự án của Kỳ ạ? 👋\n\n💡 **Anh/Chị có thể chọn nhanh các gợi ý bên dưới:**",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Đồng hồ thời gian thực
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -41,7 +44,6 @@ export function Chatbox() {
     return () => clearInterval(timer);
   }, []);
 
-  // Cuộn tự động xuống tin nhắn mới nhất
   useEffect(() => {
     if (isOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -76,7 +78,6 @@ export function Chatbox() {
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    // Tạo sẵn khung tin nhắn cho AI để nhận stream chữ
     const aiMsgId = (Date.now() + 1).toString();
     const initialAiMsg: Message = {
       id: aiMsgId,
@@ -96,7 +97,6 @@ export function Chatbox() {
         throw new Error("Missing VITE_GEMINI_API_KEY");
       }
 
-      // Gọi endpoint streamGenerateContent với alt=sse
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
         {
@@ -108,14 +108,14 @@ export function Chatbox() {
                 role: "user",
                 parts: [
                   {
-                    text: `${SYSTEM_INSTRUCTION}\n\nCâu hỏi từ Anh/Chị: "${query.trim()}"`,
+                    text: `${SYSTEM_INSTRUCTION}\n\nCâu hỏi/Lời nhắn từ người dùng: "${query.trim()}"`,
                   },
                 ],
               },
             ],
             generationConfig: {
-              temperature: 0.1, // Giảm độ biến thiên để trả lời ngắn, chính xác
-              maxOutputTokens: 200, // Khống chế độ dài tối đa giúp tăng tốc độ phản hồi & tiết kiệm token
+              temperature: 0.5, // Giúp văn phong mềm mại, tự nhiên hơn
+              maxOutputTokens: 600, // Đủ dung lượng để trả lời mượt mà không bao giờ bị cắt chữ
             },
           }),
         }
@@ -275,7 +275,7 @@ export function Chatbox() {
               );
             })}
 
-            {/* Trạng thái Đang chờ từ đầu tiên */}
+            {/* Trạng thái Đang chờ */}
             {isLoading && !messages[messages.length - 1]?.text && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gold bg-accent">
