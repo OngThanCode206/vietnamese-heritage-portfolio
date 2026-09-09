@@ -1,9 +1,9 @@
-export type Lang = "vi" | "en" | "ko";
+export type Lang = "vi" | "en" | "kr";
 
 export const languages: { code: Lang; label: string; name: string }[] = [
   { code: "vi", label: "VI", name: "Tiếng Việt" },
   { code: "en", label: "EN", name: "English" },
-  { code: "ko", label: "KO", name: "한국어" },
+  { code: "kr", label: "KR", name: "한국어" },
 ];
 
 export const profile = {
@@ -254,7 +254,7 @@ export const content: Record<Lang, Content> = {
     ],
   },
 
-  ko: {
+  kr: {
     nav: {
       about: "소개",
       experience: "경력",

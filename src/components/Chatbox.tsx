@@ -14,10 +14,6 @@ const INITIAL_SUGGESTIONS = [
   "Kỳ đang làm vị trí gì?",
   "Dự án tiêu biểu của Kỳ?",
   "Thành tích & Học vấn của Kỳ?",
-  "Kỳ đang học ở đâu?",
-  "Kỳ hiện tại đang làm dự án gì?",
-  "Kỳ sống ở đâu?",
-  "Bạn được ai làm ra?",
 ];
 
 export function Chatbox() {
@@ -37,6 +33,7 @@ export function Chatbox() {
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Cập nhật đồng hồ Live
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -44,11 +41,12 @@ export function Chatbox() {
     return () => clearInterval(timer);
   }, []);
 
+  // Tự động cuộn xuống tin nhắn mới nhất
   useEffect(() => {
     if (isOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isOpen]);
+  }, [messages, isLoading, isOpen]);
 
   const formatLiveTime = (date: Date) => {
     return date
@@ -65,6 +63,19 @@ export function Chatbox() {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
+  };
+
+  const parseAndAppendChunk = (line: string): string => {
+    const cleanLine = line.replace(/\r$/, "").trim();
+    if (!cleanLine.startsWith("data: ")) return "";
+    const jsonStr = cleanLine.replace(/^data:\s*/, "").trim();
+    if (jsonStr === "[DONE]") return "";
+    try {
+      const data = JSON.parse(jsonStr);
+      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch {
+      return "";
+    }
   };
 
   const handleSend = async (textToSend?: string) => {
@@ -86,6 +97,22 @@ export function Chatbox() {
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
+    // Xây dựng lịch sử hội thoại cho Gemini API (bỏ qua welcome & tin nhắn rỗng)
+    const historyContents = messages
+      .filter((m) => m.id !== "welcome" && m.text.trim() !== "")
+      .map((m) => ({
+        role: m.sender === "user" ? "user" : "model",
+        parts: [{ text: m.text }],
+      }));
+
+    const apiContents = [
+      ...historyContents,
+      {
+        role: "user",
+        parts: [{ text: query.trim() }],
+      },
+    ];
+
     setMessages((prev) => [...prev, userMsg, initialAiMsg]);
     if (!textToSend) setInput("");
     setIsLoading(true);
@@ -98,24 +125,18 @@ export function Chatbox() {
       }
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [
-                  {
-                    text: `${SYSTEM_INSTRUCTION}\n\nCâu hỏi/Lời nhắn từ người dùng: "${query.trim()}"`,
-                  },
-                ],
-              },
-            ],
+            systemInstruction: {
+              parts: [{ text: SYSTEM_INSTRUCTION }],
+            },
+            contents: apiContents,
             generationConfig: {
-              temperature: 0.5, // Giúp văn phong mềm mại, tự nhiên hơn
-              maxOutputTokens: 600, // Đủ dung lượng để trả lời mượt mà không bao giờ bị cắt chữ
+              temperature: 0.6,
+              maxOutputTokens: 1000,
             },
           }),
         }
@@ -133,30 +154,32 @@ export function Chatbox() {
         let buffer = "";
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+
+          if (done) {
+            if (buffer.trim()) {
+              accumulatedText += parseAndAppendChunk(buffer.trim());
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
+                )
+              );
+            }
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
 
           for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const jsonStr = line.replace(/^data:\s*/, "").trim();
-              if (jsonStr === "[DONE]") continue;
-              try {
-                const data = JSON.parse(jsonStr);
-                const chunkText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (chunkText) {
-                  accumulatedText += chunkText;
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
-                    )
-                  );
-                }
-              } catch {
-                // Bỏ qua JSON dở dang
-              }
+            const chunkText = parseAndAppendChunk(line);
+            if (chunkText) {
+              accumulatedText += chunkText;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
+                )
+              );
             }
           }
         }
@@ -258,7 +281,7 @@ export function Chatbox() {
                         : "bg-secondary/90 border border-primary/20 text-foreground rounded-tl-none shadow-sm"
                     }`}
                   >
-                    <div className="prose prose-sm max-w-none prose-p:leading-relaxed text-xs">
+                    <div className="prose prose-sm max-w-none prose-p:leading-relaxed text-xs dark:prose-invert">
                       <ReactMarkdown>{m.text}</ReactMarkdown>
                     </div>
                     <span
@@ -282,7 +305,9 @@ export function Chatbox() {
                   <Bot className="h-3.5 w-3.5 text-accent-foreground" />
                 </div>
                 <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-primary/20 bg-secondary/80 px-4 py-2.5">
-                  <span className="text-[11px] font-medium text-muted-foreground mr-1">CKy đang soạn tin nhắn</span>
+                  <span className="text-[11px] font-medium text-muted-foreground mr-1">
+                    CKy đang soạn tin nhắn
+                  </span>
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.2s]" />
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.4s]" />
@@ -328,7 +353,7 @@ export function Chatbox() {
               <button
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 <Send className="h-4 w-4" />
               </button>
@@ -341,7 +366,7 @@ export function Chatbox() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="group relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-all duration-300 hover:scale-105 active:scale-95"
+        className="group relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
         aria-label="Toggle Chat"
       >
         {isOpen ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6 transition-transform group-hover:rotate-12" />}
