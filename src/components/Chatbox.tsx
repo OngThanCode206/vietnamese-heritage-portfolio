@@ -33,7 +33,6 @@ export function Chatbox() {
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Cập nhật đồng hồ Live
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -41,7 +40,6 @@ export function Chatbox() {
     return () => clearInterval(timer);
   }, []);
 
-  // Tự động cuộn xuống tin nhắn mới nhất
   useEffect(() => {
     if (isOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -97,7 +95,6 @@ export function Chatbox() {
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    // Xây dựng lịch sử hội thoại cho Gemini API (bỏ qua welcome & tin nhắn rỗng)
     const historyContents = messages
       .filter((m) => m.id !== "welcome" && m.text.trim() !== "")
       .map((m) => ({
@@ -121,11 +118,12 @@ export function Chatbox() {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
       if (!apiKey) {
-        throw new Error("Missing VITE_GEMINI_API_KEY");
+        throw new Error("Missing VITE_GEMINI_API_KEY in .env");
       }
 
+      // Đã đổi chính xác thành model gemini-2.0-flash
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -143,6 +141,8 @@ export function Chatbox() {
       );
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Gemini API Error Response:", errorText);
         throw new Error(`HTTP Error: ${response.status}`);
       }
 
@@ -204,7 +204,6 @@ export function Chatbox() {
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
-      {/* 1. Đám mây thông báo khi đóng chatbox */}
       {showCloud && !isOpen && (
         <div className="relative mb-2 flex items-center gap-1.5 rounded-2xl border-2 border-primary/40 bg-card px-3 py-1.5 shadow-[4px_4px_0_0_var(--gold)] text-xs font-bold text-primary animate-bounce">
           <Sparkles className="h-3.5 w-3.5 text-gold" />
@@ -224,10 +223,8 @@ export function Chatbox() {
         </div>
       )}
 
-      {/* 2. Khung Chatbox */}
       {isOpen && (
         <div className="mb-2 flex h-[520px] w-[350px] sm:w-[390px] flex-col overflow-hidden rounded-2xl border-2 border-primary/40 bg-card/95 backdrop-blur-md shadow-[8px_8px_0_0_var(--gold)] transition-all animate-in fade-in zoom-in-95 duration-200">
-          {/* Header */}
           <div className="flex items-center justify-between border-b-2 border-primary/20 bg-primary px-4 py-3 text-primary-foreground">
             <div className="flex items-center gap-2.5">
               <div className="relative flex h-8 w-8 items-center justify-center rounded-full border border-gold bg-card text-primary">
@@ -253,7 +250,6 @@ export function Chatbox() {
             </button>
           </div>
 
-          {/* Danh sách Tin nhắn */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((m) => {
               if (m.sender === "ai" && !m.text && isLoading) return null;
@@ -298,7 +294,6 @@ export function Chatbox() {
               );
             })}
 
-            {/* Trạng thái Đang chờ */}
             {isLoading && !messages[messages.length - 1]?.text && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gold bg-accent">
@@ -317,7 +312,6 @@ export function Chatbox() {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Gợi ý nhanh ban đầu */}
           {messages.length <= 1 && (
             <div className="px-3 pb-2 flex flex-wrap gap-1.5">
               {INITIAL_SUGGESTIONS.map((s) => (
@@ -334,7 +328,6 @@ export function Chatbox() {
             </div>
           )}
 
-          {/* Ô Nhập tin nhắn */}
           <div className="border-t-2 border-primary/20 bg-card p-3">
             <form
               onSubmit={(e) => {
@@ -362,7 +355,6 @@ export function Chatbox() {
         </div>
       )}
 
-      {/* 3. Nút mở/đóng Chatbox */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -372,7 +364,6 @@ export function Chatbox() {
         {isOpen ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6 transition-transform group-hover:rotate-12" />}
       </button>
 
-      {/* 4. Đồng hồ thời gian thực */}
       <div className="mt-2 flex flex-col items-center rounded-lg border border-primary/20 bg-card/90 px-2.5 py-1 text-center font-mono shadow-sm backdrop-blur-sm">
         <span className="text-[11px] font-bold text-foreground leading-none">
           {formatLiveTime(currentTime)}
