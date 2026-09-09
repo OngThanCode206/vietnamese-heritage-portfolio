@@ -63,19 +63,6 @@ export function Chatbox() {
     return `${day}/${month}/${year}`;
   };
 
-  const parseAndAppendChunk = (line: string): string => {
-    const cleanLine = line.replace(/\r$/, "").trim();
-    if (!cleanLine.startsWith("data: ")) return "";
-    const jsonStr = cleanLine.replace(/^data:\s*/, "").trim();
-    if (jsonStr === "[DONE]") return "";
-    try {
-      const data = JSON.parse(jsonStr);
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    } catch {
-      return "";
-    }
-  };
-
   const handleSend = async (textToSend?: string) => {
     const query = textToSend || input;
     if (!query.trim() || isLoading) return;
@@ -121,9 +108,9 @@ export function Chatbox() {
         throw new Error("Missing VITE_GEMINI_API_KEY in .env");
       }
 
-      // Đã đổi chính xác thành model gemini-2.0-flash
+      // Gọi trực tiếp REST API của Gemini 2.0 Flash qua HTTPS trực tuyến
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -142,57 +129,27 @@ export function Chatbox() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Gemini API Error Response:", errorText);
+        console.error("API Error:", errorText);
         throw new Error(`HTTP Error: ${response.status}`);
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedText = "";
+      const data = await response.json();
+      const replyText =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "Dạ em không nhận được phản hồi từ hệ thống.";
 
-      if (reader) {
-        let buffer = "";
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) {
-            if (buffer.trim()) {
-              accumulatedText += parseAndAppendChunk(buffer.trim());
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
-                )
-              );
-            }
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            const chunkText = parseAndAppendChunk(line);
-            if (chunkText) {
-              accumulatedText += chunkText;
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
-                )
-              );
-            }
-          }
-        }
-      }
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === aiMsgId ? { ...msg, text: replyText } : msg))
+      );
     } catch (error) {
-      console.error("Chatbox Stream Error:", error);
+      console.error("Chatbox API Error:", error);
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMsgId
             ? {
                 ...msg,
                 text:
-                  "Dạ em rất tiếc, kết nối hiện đang gián đoạn một chút. Anh/Chị có thể liên hệ trực tiếp với anh Kỳ qua Email **nky57412@gmail.com** hoặc SĐT **0369 623 216** nhé ạ!\n\n💡 **Anh/Chị có muốn tìm hiểu về các dự án tiêu biểu của Kỳ không ạ?**",
+                  "Dạ em rất tiếc, kết nối trực tuyến hiện đang gián đoạn. Anh/Chị có thể liên hệ trực tiếp với anh Kỳ qua Email **nky57412@gmail.com** hoặc SĐT **0369 623 216** nhé ạ!",
               }
             : msg
         )
@@ -237,7 +194,7 @@ export function Chatbox() {
                 </h3>
                 <p className="mt-1 flex items-center gap-1 text-[10px] opacity-90">
                   <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                  Đang hoạt động
+                  Đang hoạt động (Online API)
                 </p>
               </div>
             </div>
@@ -301,7 +258,7 @@ export function Chatbox() {
                 </div>
                 <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-primary/20 bg-secondary/80 px-4 py-2.5">
                   <span className="text-[11px] font-medium text-muted-foreground mr-1">
-                    CKy đang soạn tin nhắn
+                    CKy đang trả lời
                   </span>
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.2s]" />
