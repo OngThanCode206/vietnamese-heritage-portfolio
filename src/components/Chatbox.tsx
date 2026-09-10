@@ -16,25 +16,7 @@ const INITIAL_SUGGESTIONS = [
   "Thành tích & Học vấn của Kỳ?",
 ];
 
-/*
- * ============================================================
- * GEMINI MODEL
- * ============================================================
- *
- * Gemini 1.5 Flash / Pro đã bị Google shutdown.
- *
- * Model hiện tại:
- * gemini-3.8-flash
- *
- * Có fallback để nếu model đầu tiên lỗi 404 thì thử
- * model tiếp theo.
- */
-const CANDIDATE_MODELS = [
-  "gemini-3.8-flash",
-  "gemini-3.7-flash",
-  "gemini-3.6-flash",
-  "gemini-3.5-flash",
-];
+const GEMINI_MODEL = "gemini-3.8-flash";
 
 export function Chatbox() {
   const [isOpen, setIsOpen] = useState(false);
@@ -61,7 +43,6 @@ export function Chatbox() {
    * ============================================================
    */
   useEffect(() => {
-    // Khởi tạo timestamp cho tin nhắn chào mừng
     setMessages((prev) =>
       prev.map((msg) =>
         msg.id === "welcome"
@@ -126,155 +107,47 @@ export function Chatbox() {
 
   /*
    * ============================================================
-   * GEMINI API STREAM
+   * GEMINI STREAM API
    * ============================================================
+   *
+   * Không còn console.log thông báo kết nối.
+   *
+   * Gemini trả dữ liệu tới đâu -> UI hiển thị tới đó.
    */
   const fetchGeminiStream = async (
     apiKey: string,
     apiContents: any[]
   ): Promise<Response> => {
-    let lastErrorStatus = 0;
-    let lastErrorMessage = "";
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`,
+      {
+        method: "POST",
 
-    for (const modelName of CANDIDATE_MODELS) {
-      try {
-        console.log(
-          `[Gemini] Đang gọi model: ${modelName}`
-        );
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse`,
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey,
-            },
-
-            body: JSON.stringify({
-              systemInstruction: {
-                parts: [
-                  {
-                    text: SYSTEM_INSTRUCTION,
-                  },
-                ],
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text: SYSTEM_INSTRUCTION,
               },
+            ],
+          },
 
-              contents: apiContents,
+          contents: apiContents,
 
-              generationConfig: {
-                maxOutputTokens: 2048,
-              },
-            }),
-          }
-        );
-
-        console.log(
-          `[Gemini] ${modelName} -> HTTP ${response.status}`
-        );
-
-        /*
-         * Model không tồn tại
-         * -> thử model tiếp theo
-         */
-        if (response.status === 404) {
-          lastErrorStatus = 404;
-
-          const errorText = await response.text().catch(() => "");
-
-          lastErrorMessage = errorText;
-
-          console.warn(
-            `[Gemini] Model ${modelName} trả về 404. Thử model tiếp theo...`
-          );
-
-          continue;
-        }
-
-        /*
-         * API key sai / không hợp lệ
-         */
-        if (response.status === 400 || response.status === 401) {
-          const errorText = await response.text().catch(() => "");
-
-          console.error(
-            `[Gemini] API Key hoặc request không hợp lệ:`,
-            errorText
-          );
-
-          throw new Error(
-            `Gemini API Error ${response.status}: ${errorText}`
-          );
-        }
-
-        /*
-         * Quota
-         */
-        if (response.status === 429) {
-          const errorText = await response.text().catch(() => "");
-
-          console.warn(
-            `[Gemini] Rate limit / quota exceeded:`,
-            errorText
-          );
-
-          throw new Error(
-            `Gemini API đang quá tải hoặc hết quota. HTTP 429`
-          );
-        }
-
-        /*
-         * Các lỗi khác
-         */
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => "");
-
-          console.error(
-            `[Gemini] HTTP ${response.status}:`,
-            errorText
-          );
-
-          throw new Error(
-            `Gemini API Error ${response.status}: ${errorText}`
-          );
-        }
-
-        /*
-         * Thành công
-         */
-        console.log(
-          `[Gemini] Kết nối thành công với model: ${modelName}`
-        );
-
-        return response;
-      } catch (error) {
-        /*
-         * Nếu là lỗi HTTP do API trả về thì throw luôn
-         * để không fallback sai.
-         */
-        if (
-          error instanceof Error &&
-          error.message.startsWith("Gemini API")
-        ) {
-          throw error;
-        }
-
-        console.error(
-          `[Gemini] Lỗi kết nối model ${modelName}:`,
-          error
-        );
-
-        lastErrorMessage =
-          error instanceof Error
-            ? error.message
-            : String(error);
+          generationConfig: {
+            temperature: 0.6,
+            maxOutputTokens: 2048,
+          },
+        }),
       }
-    }
-
-    throw new Error(
-      `Không có model Gemini nào khả dụng. Status: ${lastErrorStatus}. ${lastErrorMessage}`
     );
+
+    return response;
   };
 
   /*
@@ -295,9 +168,9 @@ export function Chatbox() {
     const cleanQuery = query.trim();
 
     /*
-     * ============================================================
+     * ==========================================================
      * USER MESSAGE
-     * ============================================================
+     * ==========================================================
      */
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -325,9 +198,9 @@ export function Chatbox() {
     };
 
     /*
-     * ============================================================
+     * ==========================================================
      * BUILD CHAT HISTORY
-     * ============================================================
+     * ==========================================================
      */
     const historyContents = messages
       .filter(
@@ -336,7 +209,10 @@ export function Chatbox() {
           m.text.trim() !== ""
       )
       .map((m) => ({
-        role: m.sender === "user" ? "user" : "model",
+        role:
+          m.sender === "user"
+            ? "user"
+            : "model",
 
         parts: [
           {
@@ -345,9 +221,6 @@ export function Chatbox() {
         ],
       }));
 
-    /*
-     * Thêm câu hỏi hiện tại
-     */
     const apiContents = [
       ...historyContents,
 
@@ -363,9 +236,9 @@ export function Chatbox() {
     ];
 
     /*
-     * ============================================================
+     * ==========================================================
      * UPDATE UI
-     * ============================================================
+     * ==========================================================
      */
     if (retryCount === 0) {
       setMessages((prev) => [
@@ -384,7 +257,7 @@ export function Chatbox() {
     try {
       /*
        * ========================================================
-       * GET API KEY
+       * API KEY
        * ========================================================
        */
       const apiKey =
@@ -392,59 +265,65 @@ export function Chatbox() {
 
       if (!apiKey) {
         throw new Error(
-          "Missing VITE_GEMINI_API_KEY in .env"
+          "Missing VITE_GEMINI_API_KEY"
         );
       }
-
-      /*
-       * Debug
-       *
-       * Không in API key ra console.
-       */
-      console.log(
-        "[Gemini] API Key:",
-        apiKey.substring(0, 6) + "******"
-      );
 
       /*
        * ========================================================
        * CALL GEMINI
        * ========================================================
        */
-      const response = await fetchGeminiStream(
-        apiKey,
-        apiContents
-      );
+      const response =
+        await fetchGeminiStream(
+          apiKey,
+          apiContents
+        );
 
       /*
        * ========================================================
-       * RATE LIMIT RETRY
+       * RATE LIMIT
        * ========================================================
        */
-      if (
-        response.status === 429 &&
-        retryCount < 2
-      ) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, 4000)
-        );
+      if (response.status === 429) {
+        if (retryCount < 2) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, 3000)
+          );
 
-        setIsLoading(false);
+          setIsLoading(false);
 
-        return handleSend(
-          cleanQuery,
-          retryCount + 1
+          return handleSend(
+            cleanQuery,
+            retryCount + 1
+          );
+        }
+
+        throw new Error(
+          "429_RATE_LIMIT"
         );
       }
 
       /*
        * ========================================================
-       * CHECK RESPONSE
+       * API ERROR
        * ========================================================
        */
       if (!response.ok) {
+        let errorText = "";
+
+        try {
+          errorText = await response.text();
+        } catch {
+          errorText = "";
+        }
+
         throw new Error(
-          `HTTP Error: ${response.status}`
+          `GEMINI_HTTP_${response.status}${
+            errorText
+              ? `: ${errorText}`
+              : ""
+          }`
         );
       }
 
@@ -458,7 +337,7 @@ export function Chatbox() {
 
       if (!reader) {
         throw new Error(
-          "Không nhận được response body từ Gemini."
+          "NO_RESPONSE_BODY"
         );
       }
 
@@ -472,6 +351,12 @@ export function Chatbox() {
        * ========================================================
        * READ STREAM
        * ========================================================
+       *
+       * Quan trọng:
+       *
+       * Không đợi Gemini trả xong.
+       *
+       * Mỗi chunk nhận được sẽ update React ngay.
        */
       while (true) {
         const { done, value } =
@@ -481,118 +366,27 @@ export function Chatbox() {
           break;
         }
 
-        /*
-         * Decode dữ liệu
-         */
-        buffer += decoder.decode(value, {
-          stream: true,
-        });
-
-        /*
-         * SSE thường phân cách event bằng
-         *
-         * \n\n
-         */
-        const events = buffer.split(
-          "\n\n"
+        buffer += decoder.decode(
+          value,
+          {
+            stream: true,
+          }
         );
 
         /*
-         * Giữ lại phần chưa hoàn chỉnh
+         * Gemini stream dùng SSE.
+         *
+         * Tách theo từng dòng để xử lý
+         * ngay khi nhận được.
          */
-        buffer =
-          events.pop() || "";
+        const lines =
+          buffer.split(/\r?\n/);
 
         /*
-         * ======================================================
-         * PROCESS EVENTS
-         * ======================================================
+         * Giữ dòng cuối chưa hoàn chỉnh.
          */
-        for (const event of events) {
-          const lines =
-            event.split("\n");
-
-          for (const line of lines) {
-            const cleanLine =
-              line.trim();
-
-            /*
-             * Bỏ qua các dòng không phải data
-             */
-            if (
-              !cleanLine.startsWith(
-                "data:"
-              )
-            ) {
-              continue;
-            }
-
-            const dataStr =
-              cleanLine
-                .replace(
-                  /^data:\s*/,
-                  ""
-                )
-                .trim();
-
-            if (
-              !dataStr ||
-              dataStr === "[DONE]"
-            ) {
-              continue;
-            }
-
-            try {
-              const data =
-                JSON.parse(dataStr);
-
-              const textChunk =
-                data?.candidates?.[0]
-                  ?.content?.parts?.[0]
-                  ?.text || "";
-
-              if (textChunk) {
-                accumulatedText +=
-                  textChunk;
-
-                /*
-                 * Update UI ngay khi
-                 * nhận được text
-                 */
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === aiMsgId
-                      ? {
-                          ...msg,
-                          text:
-                            accumulatedText,
-                        }
-                      : msg
-                  )
-                );
-              }
-            } catch (parseError) {
-              /*
-               * Không crash nếu một SSE chunk
-               * chưa hoàn chỉnh.
-               */
-              console.warn(
-                "[Gemini] Không parse được SSE chunk:",
-                parseError
-              );
-            }
-          }
-        }
-      }
-
-      /*
-       * ========================================================
-       * PROCESS REMAINING BUFFER
-       * ========================================================
-       */
-      if (buffer.trim()) {
-        const lines =
-          buffer.split("\n");
+        buffer =
+          lines.pop() || "";
 
         for (const line of lines) {
           const cleanLine =
@@ -625,131 +419,174 @@ export function Chatbox() {
             const data =
               JSON.parse(dataStr);
 
+            /*
+             * Gemini có thể trả nhiều parts.
+             *
+             * Gom tất cả text trong parts.
+             */
             const textChunk =
               data?.candidates?.[0]
-                ?.content?.parts?.[0]
-                ?.text || "";
+                ?.content?.parts
+                ?.map(
+                  (part: any) =>
+                    part?.text || ""
+                )
+                .join("") || "";
 
-            if (textChunk) {
-              accumulatedText +=
-                textChunk;
+            if (!textChunk) {
+              continue;
             }
+
+            /*
+             * Nối chunk mới.
+             */
+            accumulatedText +=
+              textChunk;
+
+            /*
+             * ==================================================
+             * UPDATE UI NGAY LẬP TỨC
+             * ==================================================
+             */
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMsgId
+                  ? {
+                      ...msg,
+                      text:
+                        accumulatedText,
+                    }
+                  : msg
+              )
+            );
           } catch {
-            // Bỏ qua chunk cuối không hoàn chỉnh
+            /*
+             * Chunk chưa hoàn chỉnh:
+             * bỏ qua và chờ chunk kế tiếp.
+             */
           }
         }
       }
 
       /*
        * ========================================================
-       * FINAL UI UPDATE
+       * PROCESS FINAL BUFFER
        * ========================================================
        */
-      if (accumulatedText.trim()) {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === aiMsgId
-              ? {
-                  ...msg,
-                  text:
-                    accumulatedText,
-                }
-              : msg
-          )
-        );
-      } else {
+      const finalBuffer =
+        buffer.trim();
+
+      if (
+        finalBuffer.startsWith("data:")
+      ) {
+        const dataStr =
+          finalBuffer
+            .replace(
+              /^data:\s*/,
+              ""
+            )
+            .trim();
+
+        if (
+          dataStr &&
+          dataStr !== "[DONE]"
+        ) {
+          try {
+            const data =
+              JSON.parse(dataStr);
+
+            const textChunk =
+              data?.candidates?.[0]
+                ?.content?.parts
+                ?.map(
+                  (part: any) =>
+                    part?.text || ""
+                )
+                .join("") || "";
+
+            if (textChunk) {
+              accumulatedText +=
+                textChunk;
+
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === aiMsgId
+                    ? {
+                        ...msg,
+                        text:
+                          accumulatedText,
+                      }
+                    : msg
+                )
+              );
+            }
+          } catch {
+            // Không làm gì nếu buffer cuối chưa parse được.
+          }
+        }
+      }
+
+      /*
+       * ========================================================
+       * EMPTY RESPONSE
+       * ========================================================
+       */
+      if (!accumulatedText.trim()) {
         throw new Error(
-          "Gemini trả về response nhưng không có nội dung."
+          "EMPTY_GEMINI_RESPONSE"
         );
       }
     } catch (error) {
+      /*
+       * Chỉ log khi thật sự có lỗi.
+       *
+       * Không log trạng thái kết nối thành công.
+       */
       console.error(
-        "[Chatbox] Gemini Stream Error:",
+        "[Chatbox] Gemini error:",
         error
       );
 
       let errorMessage =
         "Dạ em rất tiếc, hiện tại hệ thống AI đang gặp sự cố. Anh/Chị vui lòng thử lại sau ít giây ạ!";
 
-      /*
-       * ========================================================
-       * FRIENDLY ERROR MESSAGE
-       * ========================================================
-       */
       if (error instanceof Error) {
         const message =
           error.message.toLowerCase();
 
-        /*
-         * API KEY
-         */
         if (
+          message.includes(
+            "missing_vite_gemini_api_key"
+          ) ||
           message.includes(
             "missing vite_gemini_api_key"
           )
         ) {
           errorMessage =
-            "⚠️ Hệ thống chưa tìm thấy **VITE_GEMINI_API_KEY**. Anh/chị kiểm tra file `.env` và restart lại server nhé!";
-        }
-
-        /*
-         * 401 / API KEY
-         */
-        else if (
+            "⚠️ Hệ thống chưa tìm thấy **VITE_GEMINI_API_KEY**. Vui lòng kiểm tra Environment Variables trên Vercel.";
+        } else if (
           message.includes("401")
         ) {
           errorMessage =
-            "⚠️ API Key Gemini không hợp lệ hoặc chưa được cấp quyền. Anh/chị kiểm tra lại **VITE_GEMINI_API_KEY** nhé!";
-        }
-
-        /*
-         * 400
-         */
-        else if (
+            "⚠️ API Key Gemini không hợp lệ hoặc chưa được cấp quyền.";
+        } else if (
           message.includes("400")
         ) {
           errorMessage =
-            "⚠️ Request gửi tới Gemini không hợp lệ. Vui lòng kiểm tra cấu hình API.";
-        }
-
-        /*
-         * 429
-         */
-        else if (
+            "⚠️ Request gửi tới Gemini không hợp lệ.";
+        } else if (
           message.includes("429")
         ) {
           errorMessage =
             "⏳ Gemini đang giới hạn số lượt truy cập. Anh/Chị vui lòng thử lại sau vài giây nhé!";
-        }
-
-        /*
-         * 404
-         */
-        else if (
+        } else if (
           message.includes("404")
         ) {
           errorMessage =
-            "⚠️ Model Gemini hiện tại không khả dụng. Vui lòng kiểm tra model/API version.";
-        }
-
-        /*
-         * API ERROR
-         */
-        else if (
-          message.includes(
-            "gemini api error"
-          )
-        ) {
-          errorMessage =
-            "⚠️ Gemini API đang trả về lỗi. Anh/Chị vui lòng thử lại sau ít giây nhé!";
+            "⚠️ Model Gemini hiện tại không khả dụng.";
         }
       }
 
-      /*
-       * ========================================================
-       * SHOW ERROR IN CHAT
-       * ========================================================
-       */
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMsgId
@@ -821,6 +658,7 @@ export function Chatbox() {
                 <Bot className="h-4 w-4" />
 
                 <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card animate-pulse" />
+
               </div>
 
               <div>
@@ -833,6 +671,7 @@ export function Chatbox() {
                   Đang hoạt động
                 </p>
               </div>
+
             </div>
 
             <button
@@ -844,6 +683,7 @@ export function Chatbox() {
             >
               <X className="h-5 w-5" />
             </button>
+
           </div>
 
           {/* ==================================================
@@ -854,8 +694,8 @@ export function Chatbox() {
             {messages.map((m) => {
 
               /*
-               * Không hiển thị AI message rỗng
-               * trong lúc loading
+               * Tin nhắn AI đang rỗng thì
+               * không render bubble.
                */
               if (
                 m.sender === "ai" &&
@@ -903,6 +743,16 @@ export function Chatbox() {
                       <ReactMarkdown>
                         {m.text}
                       </ReactMarkdown>
+
+                      {/* Con trỏ đang chạy khi Gemini stream */}
+                      {m.sender === "ai" &&
+                        isLoading &&
+                        m.text && (
+                          <span
+                            className="ml-0.5 inline-block h-3 w-[2px] translate-y-[2px] bg-primary animate-pulse"
+                            aria-hidden="true"
+                          />
+                        )}
                     </div>
 
                     <span
@@ -921,7 +771,7 @@ export function Chatbox() {
             })}
 
             {/* =================================================
-                LOADING
+                INITIAL LOADING
             ================================================= */}
             {isLoading &&
               !messages[messages.length - 1]?.text && (
@@ -1040,15 +890,11 @@ export function Chatbox() {
       <div className="mt-2 flex flex-col items-center rounded-lg border border-primary/20 bg-card/90 px-2.5 py-1 text-center font-mono shadow-sm backdrop-blur-sm">
 
         <span className="text-[11px] font-bold text-foreground leading-none">
-          {formatLiveTime(
-            currentTime
-          )}
+          {formatLiveTime(currentTime)}
         </span>
 
         <span className="mt-0.5 text-[10px] text-muted-foreground leading-none">
-          {formatLiveDate(
-            currentTime
-          )}
+          {formatLiveDate(currentTime)}
         </span>
 
       </div>

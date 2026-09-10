@@ -46,16 +46,39 @@ export const Route = createFileRoute("/")({
         content:
           "Portfolio của Võ Lê Cao Kỳ, sinh viên CNTT HUTECH: dự án IoT/AI, Java Spring Boot, thành tích và kinh nghiệm làm việc.",
       },
-      { property: "og:title", content: "Võ Lê Cao Kỳ — Portfolio" },
+      {
+        property: "og:title",
+        content: "Võ Lê Cao Kỳ — Portfolio",
+      },
       {
         property: "og:description",
         content:
           "Sinh viên CNTT HUTECH (GPA 3.42/4.0). Định hướng AI, IoT/Hệ thống nhúng, Java Web Developer.",
       },
-      { property: "og:type", content: "profile" },
-      { name: "twitter:card", content: "summary_large_image" },
+      {
+        property: "og:type",
+        content: "profile",
+      },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
+      },
+    ],
+
+    /*
+     * ==========================================================
+     * FAVICON
+     * ==========================================================
+     */
+    links: [
+      {
+        rel: "icon",
+        type: "image/svg+xml",
+        href: "/favicon.svg",
+      },
     ],
   }),
+
   component: Portfolio,
 });
 
