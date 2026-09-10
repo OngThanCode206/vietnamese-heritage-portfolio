@@ -76,7 +76,7 @@ export function Chatbox() {
     }
   };
 
-  const handleSend = async (textToSend?: string) => {
+  const handleSend = async (textToSend?: string, retryCount = 0) => {
     const query = textToSend || input;
     if (!query.trim() || isLoading) return;
 
@@ -110,8 +110,15 @@ export function Chatbox() {
       },
     ];
 
-    setMessages((prev) => [...prev, userMsg, initialAiMsg]);
-    if (!textToSend) setInput("");
+    if (retryCount === 0) {
+      setMessages((prev) => [...prev, userMsg, initialAiMsg]);
+      if (!textToSend) setInput("");
+    } else {
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === aiMsgId ? { ...msg, text: "" } : msg))
+      );
+    }
+
     setIsLoading(true);
 
     try {
@@ -121,7 +128,6 @@ export function Chatbox() {
         throw new Error("Missing VITE_GEMINI_API_KEY in .env");
       }
 
-      // Sử dụng streamGenerateContent với alt=sse để chữ hiện ra ngay lập tức mượt mà
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
         {
@@ -139,6 +145,13 @@ export function Chatbox() {
           }),
         }
       );
+
+      // Nếu gặp lỗi 429 (vượt giới hạn quota), tự động chờ 5 giây rồi thử lại tối đa 2 lần
+      if (response.status === 429 && retryCount < 2) {
+        console.warn(`API quá tải (429), đang tự động thử lại lần ${retryCount + 1}...`);
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        return handleSend(query, retryCount + 1);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -192,7 +205,7 @@ export function Chatbox() {
             ? {
                 ...msg,
                 text:
-                  "Dạ em rất tiếc, kết nối hiện đang gián đoạn một chút. Anh/Chị có thể liên hệ trực tiếp với anh Kỳ qua Email **nky57412@gmail.com** hoặc SĐT **0369 623 216** nhé ạ!",
+                  "Dạ em rất tiếc, hệ thống đang bận do có nhiều lượt truy cập cùng lúc. Anh/Chị vui lòng thử lại sau vài giây hoặc liên hệ trực tiếp với anh Kỳ qua Email **nky57412@gmail.com** nhé ạ!",
               }
             : msg
         )
