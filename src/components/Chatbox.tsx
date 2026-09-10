@@ -16,6 +16,14 @@ const INITIAL_SUGGESTIONS = [
   "Thành tích & Học vấn của Kỳ?",
 ];
 
+// Danh sách các Model Gemini từ mới nhất/mạnh nhất đến dự phòng
+const CANDIDATE_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash-latest",
+  "gemini-pro",
+];
+
 export function Chatbox() {
   const [isOpen, setIsOpen] = useState(false);
   const [showCloud, setShowCloud] = useState(true);
@@ -61,6 +69,45 @@ export function Chatbox() {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
+  };
+
+  // Hàm tự động thử lần lượt từng model nếu gặp lỗi 404
+  const fetchGeminiStream = async (apiKey: string, apiContents: any[]) => {
+    let lastErrorStatus = 0;
+
+    for (const modelName of CANDIDATE_MODELS) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${apiKey}&alt=sse`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: SYSTEM_INSTRUCTION }],
+              },
+              contents: apiContents,
+              generationConfig: {
+                temperature: 0.6,
+                maxOutputTokens: 2048,
+              },
+            }),
+          }
+        );
+
+        if (response.status === 404) {
+          console.warn(`Model ${modelName} bị 404, tự động đổi sang model tiếp theo...`);
+          lastErrorStatus = 404;
+          continue;
+        }
+
+        return response;
+      } catch (err) {
+        console.error(`Lỗi kết nối tới model ${modelName}:`, err);
+      }
+    }
+
+    throw new Error(`Tất cả model đều không khả dụng (Status: ${lastErrorStatus})`);
   };
 
   const handleSend = async (textToSend?: string, retryCount = 0) => {
@@ -115,28 +162,10 @@ export function Chatbox() {
         throw new Error("Missing VITE_GEMINI_API_KEY in .env");
       }
 
-      // Đã đổi sang gemini-1.5-pro-latest (Bản cao cấp nhất)
-      // Nếu dòng 1.5 vẫn bị 404 trên tài khoản của bạn, hãy sửa chuỗi "gemini-1.5-pro-latest" thành "gemini-pro"
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: {
-              parts: [{ text: SYSTEM_INSTRUCTION }],
-            },
-            contents: apiContents,
-            generationConfig: {
-              temperature: 0.6,
-              maxOutputTokens: 2048,
-            },
-          }),
-        }
-      );
+      const response = await fetchGeminiStream(apiKey, apiContents);
 
       if (response.status === 429 && retryCount < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await new Promise((resolve) => setTimeout(resolve, 4000));
         return handleSend(query, retryCount + 1);
       }
 
@@ -155,18 +184,18 @@ export function Chatbox() {
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          
+
           const parts = buffer.split("\n\n");
           buffer = parts.pop() || "";
 
           let hasNewText = false;
-          
+
           for (const part of parts) {
             const cleanPart = part.trim();
             if (cleanPart.startsWith("data: ")) {
               const dataStr = cleanPart.replace(/^data:\s*/, "");
               if (dataStr === "[DONE]") continue;
-              
+
               try {
                 const data = JSON.parse(dataStr);
                 const textChunk = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -174,8 +203,8 @@ export function Chatbox() {
                   accumulatedText += textChunk;
                   hasNewText = true;
                 }
-              } catch (e) {
-                console.warn("Chunk delay, waiting for next packet...");
+              } catch {
+                // Đang chờ dữ liệu đủ khung
               }
             }
           }

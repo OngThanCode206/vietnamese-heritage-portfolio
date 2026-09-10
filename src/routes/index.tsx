@@ -25,8 +25,12 @@ declare global {
   }
 }
 
-// Danh sách 4 bài nhạc YouTube bạn chọn
-const PLAYLIST = [
+interface Track {
+  title: string;
+  id: string;
+}
+
+const PLAYLIST: Track[] = [
   { title: "Die With A Smile", id: "kPa7bsKwL-c" },
   { title: "Hello Em Có Khỏe Không 👽", id: "Q4cDgcvPBG4" },
   { title: "Xương Rồng", id: "4jjOH2FR6-E" },
@@ -87,7 +91,7 @@ function MusicPlayer() {
   const [isReady, setIsReady] = useState(false);
 
   const playerRef = useRef<any>(null);
-  const currentTrack = PLAYLIST[currentIndex];
+  const currentTrack: Track = PLAYLIST[currentIndex] ?? PLAYLIST[0] ?? { title: "", id: "" };
 
   useEffect(() => {
     const initPlayer = () => {
@@ -95,7 +99,7 @@ function MusicPlayer() {
       playerRef.current = new window.YT.Player("yt-audio-element", {
         height: "0",
         width: "0",
-        videoId: PLAYLIST[0].id,
+        videoId: PLAYLIST[0]?.id ?? "",
         playerVars: {
           autoplay: 0,
           controls: 0,
@@ -118,7 +122,11 @@ function MusicPlayer() {
       const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
       const firstScriptTag = document.getElementsByTagName("script")[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+      if (firstScriptTag && firstScriptTag.parentNode) {
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      } else {
+        document.head.appendChild(tag);
+      }
       window.onYouTubeIframeAPIReady = initPlayer;
     } else {
       initPlayer();
@@ -167,7 +175,7 @@ function MusicPlayer() {
 
   useEffect(() => {
     if (playerRef.current && playerRef.current.loadVideoById) {
-      playerRef.current.loadVideoById(PLAYLIST[currentIndex].id);
+      playerRef.current.loadVideoById(currentTrack.id);
       if (isPlaying) {
         playerRef.current.playVideo();
       }
@@ -223,7 +231,6 @@ function MusicPlayer() {
     <div className="relative inline-block">
       <div id="yt-audio-element" className="hidden" />
 
-      {/* Nút bật/tắt & mở trình điều khiển nhạc ở Header */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -242,7 +249,6 @@ function MusicPlayer() {
         <span className="hidden sm:inline truncate max-w-[100px]">{currentTrack.title}</span>
       </button>
 
-      {/* Bảng Popover điều khiển nhạc đầy đủ */}
       {isOpen && (
         <div className="absolute right-0 top-11 z-50 w-72 rounded-2xl border-2 border-primary/40 bg-card/95 p-3.5 shadow-[6px_6px_0_0_var(--gold)] backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
           <div className="flex items-center justify-between font-bold text-primary">
@@ -252,7 +258,6 @@ function MusicPlayer() {
             </span>
           </div>
 
-          {/* Thanh thời gian (Seek Bar) */}
           <div className="mt-2 flex items-center gap-2">
             <span className="w-8 text-[10px] font-mono text-muted-foreground">
               {formatTime(currentTime)}
@@ -270,7 +275,6 @@ function MusicPlayer() {
             </span>
           </div>
 
-          {/* Bộ nút điều khiển */}
           <div className="mt-2 flex items-center justify-between pt-1 border-t border-primary/10">
             <button
               type="button"
@@ -424,13 +428,11 @@ function Portfolio() {
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
-            {/* Trình phát nhạc mới thay thế cho MusicToggle cũ */}
             <MusicPlayer />
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
       <section id="gioi-thieu" className="relative overflow-hidden scroll-mt-24">
         <div aria-hidden className="pointer-events-none absolute inset-0 flex justify-center">
           <img
@@ -516,7 +518,6 @@ function Portfolio() {
         </div>
       </section>
 
-      {/* Experience Section */}
       <Section
         id="kinh-nghiem"
         eyebrow={t.sections.experience.eyebrow}
@@ -540,7 +541,6 @@ function Portfolio() {
         </div>
       </Section>
 
-      {/* Projects Section */}
       <Section id="du-an" eyebrow={t.sections.projects.eyebrow} title={t.sections.projects.title}>
         <div className="grid gap-6 md:grid-cols-2">
           {t.projects.map((p) => (
@@ -567,7 +567,6 @@ function Portfolio() {
         </div>
       </Section>
 
-      {/* Skills Section */}
       <Section id="ky-nang" eyebrow={t.sections.skills.eyebrow} title={t.sections.skills.title}>
         <div className="grid gap-6 md:grid-cols-3">
           {t.skills.map((s) => (
@@ -585,7 +584,6 @@ function Portfolio() {
         </div>
       </Section>
 
-      {/* Achievements Section */}
       <Section
         id="thanh-tich"
         eyebrow={t.sections.achievements.eyebrow}
@@ -606,7 +604,6 @@ function Portfolio() {
         </ul>
       </Section>
 
-      {/* Contact Section */}
       <Section id="lien-he" eyebrow={t.sections.contact.eyebrow} title={t.sections.contact.title}>
         <div className="flex flex-wrap gap-3">
           {socials.map((s) => (
