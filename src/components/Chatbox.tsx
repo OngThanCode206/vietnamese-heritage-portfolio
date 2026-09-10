@@ -25,16 +25,17 @@ const INITIAL_SUGGESTIONS = [
  *   rồi tự chuyển sang model tiếp theo.
  */
 const GEMINI_MODELS = [
-  "gemini-3.8-flash",
-  "gemini-3.7-flash",
+  // Ưu tiên Flash-Lite cho chatbot portfolio: Google mô tả đây là
+  // model 3.5 nhanh, tiết kiệm và tối ưu cho high-throughput.
+  "gemini-3.5-flash-lite",
   "gemini-3.6-flash",
-  "gemini-3.5-flash",
 ] as const;
 
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
-const MAX_RETRIES_PER_MODEL = 2;
-const RETRY_DELAYS_MS = [700, 1400];
-const REQUEST_TIMEOUT_MS = 15000;
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const MAX_RETRIES_PER_MODEL = 1;
+const RETRY_DELAY_MS = 650;
+const REQUEST_TIMEOUT_MS = 8000;
+const MAX_ANSWER_CHARS = 5000;
 
 const API_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
@@ -148,21 +149,22 @@ async function fetchGeminiText(
   let lastStatus = 0;
   let lastBody = "";
 
+  // Không retry lòng vòng hàng loạt model. Mỗi model chỉ thử tối đa 2 lần,
+  // sau đó chuyển model kế tiếp. Điều này giữ tổng thời gian lỗi dưới mức chấp nhận được.
   for (const modelName of GEMINI_MODELS) {
-    try {
+    for (let attempt = 0; attempt < MAX_RETRIES_PER_MODEL + 1; attempt += 1) {
+      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+
       const controller = new AbortController();
-      const handleAbort = () => controller.abort();
-      signal.addEventListener("abort", handleAbort, { once: true });
-
-      const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-      let response: Response;
+      const forwardAbort = () => controller.abort();
+      signal.addEventListener("abort", forwardAbort, { once: true });
+      const timeoutId = window.setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS
+      );
 
       try {
-        // Dùng generateContent thay vì streamGenerateContent.
-        // Chatbox vẫn có hiệu ứng gõ chữ ở UI, nhưng tránh lỗi SSE/buffering
-        // khiến bubble AI bị rỗng hoặc loading vô hạn trên browser/Vercel.
-        response = await fetch(
+        const response = await fetch(
           `${API_BASE_URL}/${modelName}:generateContent`,
           {
             method: "POST",
@@ -172,76 +174,101 @@ async function fetchGeminiText(
             },
             body: JSON.stringify({
               systemInstruction: {
-                parts: [{ text: SYSTEM_INSTRUCTION }],
+                parts: [
+                  {
+                    text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Trả lời bằng tiếng Việt, tự nhiên và trực tiếp.\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp trong system instruction.\n- Ưu tiên 2-5 câu ngắn hoặc các gạch đầu dòng cần thiết.\n- Không suy đoán thông tin cá nhân chưa có trong portfolio.\n- Không lặp lại câu hỏi của người dùng.\n- Trả lời đủ ý nhưng ngắn gọn, tránh lan man.`,
+                  },
+                ],
               },
               contents: apiContents,
               generationConfig: {
                 thinkingConfig: {
-                  thinkingLevel: "low",
+                  // Flash-Lite hỗ trợ minimal/low/medium/high.
+                  // Minimal ưu tiên tốc độ cho các câu hỏi portfolio đơn giản.
+                  thinkingLevel: "minimal",
                 },
-                maxOutputTokens: 700,
+                maxOutputTokens: 800,
               },
             }),
             signal: controller.signal,
           }
         );
+
+        if (response.ok) {
+          const data = await response.json();
+          const parts = data?.candidates?.[0]?.content?.parts;
+          const finishReason = data?.candidates?.[0]?.finishReason;
+
+          const text = Array.isArray(parts)
+            ? parts
+                .map((part: { text?: unknown }) =>
+                  typeof part?.text === "string" ? part.text : ""
+                )
+                .join("")
+                .trim()
+            : "";
+
+          if (text) {
+            // Không để một response bất thường làm UI phải gõ vô hạn.
+            return text.slice(0, MAX_ANSWER_CHARS);
+          }
+
+          if (finishReason === "MAX_TOKENS") {
+            throw new Error("Gemini đã đạt giới hạn output token nhưng không trả về text.");
+          }
+
+          throw new Error(
+            "Gemini trả về response nhưng không có nội dung văn bản."
+          );
+        }
+
+        lastStatus = response.status;
+        lastBody = await readErrorBody(response);
+
+        if (response.status === 400 || response.status === 401 || response.status === 403) {
+          throw new Error(getApiErrorMessage(response.status, lastBody));
+        }
+
+        // 404 thường là model không khả dụng; chuyển model ngay.
+        // 429/5xx/408 chỉ retry đúng một lần rồi chuyển model.
+        if (!RETRYABLE_STATUS.has(response.status) || attempt >= MAX_RETRIES_PER_MODEL) {
+          break;
+        }
+      } catch (error) {
+        if (isAbortError(error)) {
+          if (signal.aborted) throw error;
+
+          lastStatus = 504;
+          lastBody = "Request timeout";
+
+          // Timeout không retry cùng model; chuyển model kế tiếp để tránh treo chat.
+          break;
+        }
+
+        if (
+          error instanceof Error &&
+          error.message.startsWith("Gemini API Error")
+        ) {
+          throw error;
+        }
+
+        lastBody = error instanceof Error ? error.message : String(error);
+        break;
       } finally {
         window.clearTimeout(timeoutId);
-        signal.removeEventListener("abort", handleAbort);
+        signal.removeEventListener("abort", forwardAbort);
       }
 
-      if (response.ok) {
-        const data = await response.json();
-        const parts = data?.candidates?.[0]?.content?.parts;
-        const text = Array.isArray(parts)
-          ? parts
-              .map((part: { text?: unknown }) =>
-                typeof part?.text === "string" ? part.text : ""
-              )
-              .join("")
-              .trim()
-          : "";
-
-        if (text) return text;
-
-        throw new Error("Gemini trả về response nhưng không có nội dung.");
+      if (attempt < MAX_RETRIES_PER_MODEL) {
+        await sleep(RETRY_DELAY_MS);
       }
-
-      lastStatus = response.status;
-      lastBody = await readErrorBody(response);
-
-      if (response.status === 400 || response.status === 401 || response.status === 403) {
-        throw new Error(getApiErrorMessage(response.status, lastBody));
-      }
-
-      // 404/429/5xx: thử model tiếp theo. 503 không retry cùng model để
-      // tránh người dùng phải chờ quá lâu khi backend đang quá tải.
-      continue;
-    } catch (error) {
-      if (isAbortError(error)) {
-        if (signal.aborted) throw error;
-
-        lastStatus = 504;
-        lastBody = "Request timeout";
-        continue;
-      }
-
-      if (
-        error instanceof Error &&
-        error.message.startsWith("Gemini API Error")
-      ) {
-        throw error;
-      }
-
-      lastBody = error instanceof Error ? error.message : String(error);
-      continue;
     }
   }
 
   throw new Error(
     lastStatus
       ? getApiErrorMessage(lastStatus, lastBody)
-      : "GEMINI_NO_AVAILABLE_MODEL"
+      : lastBody || "GEMINI_NO_AVAILABLE_MODEL"
   );
 }
 
@@ -462,14 +489,18 @@ export function Chatbox() {
           controller.signal
         );
 
-        // API trả về trọn câu trả lời một lần; phần này tạo hiệu ứng gõ
-        // từng ký tự mà không phụ thuộc SSE/buffering của browser.
+        // Typewriter thật nhưng theo batch nhỏ mỗi frame để không biến
+        // hiệu ứng gõ thành nguyên nhân làm câu trả lời kéo dài hàng chục giây.
         let typedText = "";
-        for (const char of answerText) {
+        const CHARS_PER_TICK = 4;
+        const TICK_MS = 16;
+
+        for (let index = 0; index < answerText.length; index += CHARS_PER_TICK) {
           if (controller.signal.aborted) return;
-          typedText += char;
+
+          typedText += answerText.slice(index, index + CHARS_PER_TICK);
           updateMessage(aiMsgId, typedText);
-          await sleep(8);
+          await sleep(TICK_MS);
         }
       } catch (error) {
         if (isAbortError(error)) {
