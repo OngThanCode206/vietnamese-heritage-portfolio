@@ -33,7 +33,8 @@ const GEMINI_MODELS = [
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const MAX_RETRIES_PER_MODEL = 2;
-const RETRY_DELAYS_MS = [900, 1800];
+const RETRY_DELAYS_MS = [700, 1400];
+const REQUEST_TIMEOUT_MS = 15000;
 
 const API_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
@@ -150,30 +151,56 @@ async function fetchGeminiStream(
   for (const modelName of GEMINI_MODELS) {
     for (let attempt = 0; attempt < MAX_RETRIES_PER_MODEL; attempt++) {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/${modelName}:streamGenerateContent?alt=sse`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey,
-            },
-            body: JSON.stringify({
-              systemInstruction: {
-                parts: [{ text: SYSTEM_INSTRUCTION }],
+        // Không để request treo vô hạn: nếu Gemini không trả byte đầu tiên
+        // trong 15 giây, chuyển nhanh sang model dự phòng.
+        const requestController = new AbortController();
+        let timedOut = false;
+
+        const handleAbort = () => requestController.abort();
+        signal.addEventListener("abort", handleAbort, { once: true });
+
+        const timeoutId = window.setTimeout(() => {
+          timedOut = true;
+          requestController.abort();
+        }, REQUEST_TIMEOUT_MS);
+
+        let response: Response;
+
+        try {
+          response = await fetch(
+            `${API_BASE_URL}/${modelName}:streamGenerateContent?alt=sse`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": apiKey,
               },
-              contents: apiContents,
-              generationConfig: {
-                // Portfolio chatbot ưu tiên tốc độ hơn reasoning sâu.
-                thinkingConfig: {
-                  thinkingLevel: "low",
+              body: JSON.stringify({
+                systemInstruction: {
+                  parts: [{ text: SYSTEM_INSTRUCTION }],
                 },
-                maxOutputTokens: 1200,
-              },
-            }),
-            signal,
-          }
-        );
+                contents: apiContents,
+                generationConfig: {
+                  // Portfolio chatbot ưu tiên tốc độ hơn reasoning sâu.
+                  thinkingConfig: {
+                    thinkingLevel: "low",
+                  },
+                  maxOutputTokens: 1200,
+                },
+              }),
+              signal: requestController.signal,
+            }
+          );
+        } finally {
+          window.clearTimeout(timeoutId);
+          signal.removeEventListener("abort", handleAbort);
+        }
+
+        if (timedOut) {
+          lastStatus = 503;
+          lastBody = "Request timeout";
+          break;
+        }
 
         if (response.ok) {
           return response;
@@ -196,10 +223,16 @@ async function fetchGeminiStream(
           break;
         }
 
-        // Lỗi tạm thời -> retry cùng model trước khi fallback.
+        // 503 = model/provider đang quá tải: fallback ngay để tránh
+        // trạng thái "CKy đang trả lời..." kéo dài hàng chục giây.
+        if (response.status === 503) {
+          break;
+        }
+
+        // Các lỗi tạm thời khác chỉ retry tối đa một lần rồi fallback.
         if (RETRYABLE_STATUS.has(response.status)) {
           if (attempt < MAX_RETRIES_PER_MODEL - 1) {
-            await sleep(RETRY_DELAYS_MS[attempt] ?? 900);
+            await sleep(RETRY_DELAYS_MS[attempt] ?? 700);
             continue;
           }
 
@@ -487,8 +520,8 @@ export function Chatbox() {
               accumulatedText += char;
               updateMessage(aiMsgId, accumulatedText);
 
-              // ~20ms/ký tự: nhìn như đang gõ nhưng không quá chậm.
-              await sleep(20);
+              // ~10ms/ký tự: vẫn có hiệu ứng gõ nhưng không làm câu trả lời bị kéo dài.
+              await sleep(10);
             }
 
             typingWorker = null;
