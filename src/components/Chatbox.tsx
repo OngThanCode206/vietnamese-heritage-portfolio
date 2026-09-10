@@ -164,7 +164,11 @@ async function fetchGeminiStream(
               },
               contents: apiContents,
               generationConfig: {
-                maxOutputTokens: 2048,
+                // Portfolio chatbot ưu tiên tốc độ hơn reasoning sâu.
+                thinkingConfig: {
+                  thinkingLevel: "low",
+                },
+                maxOutputTokens: 1200,
               },
             }),
             signal,
@@ -405,13 +409,16 @@ export function Chatbox() {
         timestamp: formatMessageTime(now),
       };
 
-      const historyContents = messages
+      // Chỉ giữ lịch sử gần nhất để giảm input token và latency.
+      const recentMessages = messages
         .filter(
           (message) =>
             message.id !== "welcome" &&
             message.text.trim() !== ""
         )
-        .map((message) => ({
+        .slice(-8);
+
+      const historyContents = recentMessages.map((message) => ({
           role:
             message.sender === "user"
               ? ("user" as const)
@@ -465,16 +472,37 @@ export function Chatbox() {
         let accumulatedText = "";
         let receivedText = false;
 
+        // Gemini stream thường trả về theo "chunk" gồm nhiều ký tự.
+        // Queue này biến chunk thành hiệu ứng gõ từng ký tự ở UI.
+        let typingQueue = "";
+        let typingWorker: Promise<void> | null = null;
+
+        const startTypewriter = () => {
+          if (typingWorker) return;
+
+          typingWorker = (async () => {
+            while (typingQueue.length > 0) {
+              const char = typingQueue.charAt(0);
+              typingQueue = typingQueue.slice(1);
+              accumulatedText += char;
+              updateMessage(aiMsgId, accumulatedText);
+
+              // ~20ms/ký tự: nhìn như đang gõ nhưng không quá chậm.
+              await sleep(20);
+            }
+
+            typingWorker = null;
+          })();
+        };
+
         const processEvent = (event: string) => {
           const chunk = extractTextFromSseEvent(event);
 
           if (!chunk) return;
 
           receivedText = true;
-          accumulatedText += chunk;
-
-          // Cập nhật UI ngay khi Gemini gửi chunk -> hiệu ứng streaming thật.
-          updateMessage(aiMsgId, accumulatedText);
+          typingQueue += chunk;
+          startTypewriter();
         };
 
         try {
@@ -497,6 +525,11 @@ export function Chatbox() {
 
           if (buffer.trim()) {
             processEvent(buffer);
+          }
+
+          // Chờ UI gõ hết queue trước khi kết thúc trạng thái loading.
+          if (typingWorker) {
+            await typingWorker;
           }
         } finally {
           reader.releaseLock();
