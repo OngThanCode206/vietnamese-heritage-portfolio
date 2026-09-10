@@ -84,6 +84,97 @@ function isAbortError(error: unknown): boolean {
   );
 }
 
+type ResponseLanguage = "vi" | "en" | "ko";
+
+/**
+ * Xác định ngôn ngữ của câu hỏi MỚI NHẤT trước khi gửi Gemini.
+ * Làm ở client để không phụ thuộc vào việc model tự đoán ngôn ngữ,
+ * đặc biệt với các câu ngắn như "hello", "hi", "thanks".
+ */
+function detectResponseLanguage(text: string): ResponseLanguage {
+  const normalized = text.toLowerCase().trim();
+
+  // Korean: chỉ cần có Hangul là ưu tiên tiếng Hàn.
+  const koreanChars = normalized.match(/[가-힣ㄱ-ㅎㅏ-ㅣ]/g)?.length ?? 0;
+  if (koreanChars >= 2) return "ko";
+
+  // Vietnamese có dấu: nhận diện chắc chắn.
+  if (/[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i.test(normalized)) {
+    return "vi";
+  }
+
+  // Vietnamese không dấu: dùng nhóm từ thường gặp để không nhầm với English.
+  const vietnameseWords = [
+    "xin", "chao", "chào", "anh", "chi", "chị", "em", "toi", "tôi",
+    "minh", "mình", "ky", "kỳ", "dang", "đang", "lam", "làm",
+    "gi", "gì", "nao", "nào", "du", "dự", "an", "án", "hoc", "học",
+    "van", "vấn", "de", "đề", "kinh", "nghiem", "nghiệm", "thanh",
+    "tich", "tích", "truong", "trường", "cong", "nghe", "công", "nghệ",
+    "duoc", "được", "khong", "không", "co", "có", "nhung", "những",
+    "cua", "của", "voi", "với", "the", "thế", "gioi", "giới", "bao",
+    "nhieu", "nhiều", "nhat", "nhất", "la", "là", "va", "và", "hay",
+    "gioi", "giỏi", "du an", "dự án",
+  ];
+
+  const words: string[] = normalized.match(/[a-zA-ZÀ-ỹĐđ]+/g) ?? [];
+  const viScore = vietnameseWords.reduce(
+    (score, word) => score + (words.includes(word) ? 1 : 0),
+    0
+  );
+
+  if (viScore >= 1) return "vi";
+
+  // Các câu tiếng Anh rất ngắn như "hello", "hi", "thanks" cần được ép English.
+  const englishWords = [
+    "hello", "hi", "hey", "thanks", "thank", "please", "what", "who",
+    "where", "when", "why", "how", "which", "can", "could", "would",
+    "tell", "show", "about", "project", "projects", "experience", "skill",
+    "skills", "education", "achievement", "achievements", "student", "developer",
+    "work", "working", "study", "studying", "portfolio", "contact", "email",
+    "is", "are", "do", "does", "did", "has", "have", "and", "or", "the",
+    "a", "an", "my", "your", "his", "her", "of", "for", "with", "on",
+  ];
+
+  const enScore = englishWords.reduce((score, word) => {
+    return score + (words.includes(word) ? 1 : 0);
+  }, 0);
+
+  if (enScore >= 1) return "en";
+
+  // Nếu không có dấu hiệu rõ ràng, mặc định tiếng Việt để giữ hành vi cũ.
+  return "vi";
+}
+
+function getLanguageInstruction(language: ResponseLanguage): string {
+  if (language === "en") {
+    return `
+LANGUAGE OVERRIDE FOR THIS REQUEST:
+- The user's latest message is in ENGLISH.
+- You MUST answer in ENGLISH only.
+- Do NOT answer in Vietnamese or Korean, even if previous messages were Vietnamese.
+- Do NOT translate the question into Vietnamese before answering.
+- Keep names, project names, and technical terms as appropriate.
+`;
+  }
+
+  if (language === "ko") {
+    return `
+LANGUAGE OVERRIDE FOR THIS REQUEST:
+- The user's latest message is in KOREAN.
+- You MUST answer in KOREAN only (한국어).
+- Do NOT answer in Vietnamese or English, even if previous messages were Vietnamese.
+- Do NOT translate the question into Vietnamese before answering.
+`;
+  }
+
+  return `
+LANGUAGE OVERRIDE FOR THIS REQUEST:
+- The user's latest message is in VIETNAMESE.
+- You MUST answer in VIETNAMESE only.
+- Do NOT switch to English or Korean.
+`;
+}
+
 function getApiErrorMessage(status: number, body: string): string {
   let detail = "";
 
@@ -144,6 +235,7 @@ async function fetchGeminiText(
     role: "user" | "model";
     parts: Array<{ text: string }>;
   }>,
+  responseLanguage: ResponseLanguage,
   signal: AbortSignal
 ): Promise<string> {
   let lastStatus = 0;
@@ -176,7 +268,7 @@ async function fetchGeminiText(
               systemInstruction: {
                 parts: [
                   {
-                    text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Luôn trả lời bằng đúng ngôn ngữ chính của câu hỏi MỚI NHẤT của người dùng.\n- Nếu người dùng hỏi bằng tiếng Việt, trả lời hoàn toàn bằng tiếng Việt.\n- Nếu người dùng hỏi bằng tiếng Anh, trả lời hoàn toàn bằng tiếng Anh.\n- Nếu người dùng hỏi bằng tiếng Hàn (Hangul), trả lời hoàn toàn bằng tiếng Hàn.\n- Nếu câu hỏi pha trộn nhiều ngôn ngữ, dùng ngôn ngữ chiếm ưu thế trong câu hỏi; không tự ý đổi sang tiếng Việt.\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp trong system instruction.\n- Ưu tiên 2-5 câu ngắn hoặc các gạch đầu dòng cần thiết.\n- Không suy đoán thông tin cá nhân chưa có trong portfolio.\n- Không lặp lại câu hỏi của người dùng.\n- Trả lời đủ ý nhưng ngắn gọn, tự nhiên và trực tiếp.`,
+                    text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp trong system instruction.\n- Ưu tiên 2-5 câu ngắn hoặc các gạch đầu dòng cần thiết.\n- Không suy đoán thông tin cá nhân chưa có trong portfolio.\n- Không lặp lại câu hỏi của người dùng.\n- Trả lời đủ ý nhưng ngắn gọn, tự nhiên và trực tiếp.\n\n${getLanguageInstruction(responseLanguage)}`,
                   },
                 ],
               },
@@ -425,6 +517,7 @@ export function Chatbox() {
       }
 
       const now = new Date();
+      const responseLanguage = detectResponseLanguage(query);
 
       const userMsg: Message = {
         id: createId("user"),
@@ -459,11 +552,23 @@ export function Chatbox() {
           parts: [{ text: message.text }],
         }));
 
+      const languageLabel =
+        responseLanguage === "en"
+          ? "ENGLISH"
+          : responseLanguage === "ko"
+            ? "KOREAN"
+            : "VIETNAMESE";
+
+      // Gửi kèm chỉ thị ngôn ngữ ngay trong lượt user mới nhất.
+      // Điều này giúp model không bị ảnh hưởng bởi lịch sử chat tiếng Việt
+      // hoặc bởi SYSTEM_INSTRUCTION cũ có quy tắc trả lời tiếng Việt.
+      const latestUserPrompt = `[RESPONSE LANGUAGE: ${languageLabel}]\nRespond ONLY in ${languageLabel}. Do not switch to another language.\n\nUSER QUESTION:\n${query}`;
+
       const apiContents = [
         ...historyContents,
         {
           role: "user" as const,
-          parts: [{ text: query }],
+          parts: [{ text: latestUserPrompt }],
         },
       ];
 
@@ -486,6 +591,7 @@ export function Chatbox() {
         const answerText = await fetchGeminiText(
           apiKey,
           apiContents,
+          responseLanguage,
           controller.signal
         );
 
