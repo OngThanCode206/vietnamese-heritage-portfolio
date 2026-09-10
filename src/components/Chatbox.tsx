@@ -115,9 +115,10 @@ export function Chatbox() {
         throw new Error("Missing VITE_GEMINI_API_KEY in .env");
       }
 
-      // Đổi thành gemini-1.5-flash để stream ổn định và nhanh nhất
+      // Đã đổi sang gemini-1.5-pro-latest (Bản cao cấp nhất)
+      // Nếu dòng 1.5 vẫn bị 404 trên tài khoản của bạn, hãy sửa chuỗi "gemini-1.5-pro-latest" thành "gemini-pro"
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -128,7 +129,7 @@ export function Chatbox() {
             contents: apiContents,
             generationConfig: {
               temperature: 0.6,
-              maxOutputTokens: 4096, // Đã tăng token lên mức cao để không bị cắt ngang câu
+              maxOutputTokens: 2048,
             },
           }),
         }
@@ -155,7 +156,6 @@ export function Chatbox() {
 
           buffer += decoder.decode(value, { stream: true });
           
-          // Thuật toán tách SSE chuẩn bằng 2 dấu xuống dòng (\n\n) giúp không bị vỡ JSON
           const parts = buffer.split("\n\n");
           buffer = parts.pop() || "";
 
