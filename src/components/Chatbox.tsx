@@ -176,7 +176,7 @@ async function fetchGeminiText(
               systemInstruction: {
                 parts: [
                   {
-                    text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Trả lời bằng tiếng Việt, tự nhiên và trực tiếp.\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp trong system instruction.\n- Ưu tiên 2-5 câu ngắn hoặc các gạch đầu dòng cần thiết.\n- Không suy đoán thông tin cá nhân chưa có trong portfolio.\n- Không lặp lại câu hỏi của người dùng.\n- Trả lời đủ ý nhưng ngắn gọn, tránh lan man.`,
+                    text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Luôn trả lời bằng đúng ngôn ngữ chính của câu hỏi MỚI NHẤT của người dùng.\n- Nếu người dùng hỏi bằng tiếng Việt, trả lời hoàn toàn bằng tiếng Việt.\n- Nếu người dùng hỏi bằng tiếng Anh, trả lời hoàn toàn bằng tiếng Anh.\n- Nếu người dùng hỏi bằng tiếng Hàn (Hangul), trả lời hoàn toàn bằng tiếng Hàn.\n- Nếu câu hỏi pha trộn nhiều ngôn ngữ, dùng ngôn ngữ chiếm ưu thế trong câu hỏi; không tự ý đổi sang tiếng Việt.\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp trong system instruction.\n- Ưu tiên 2-5 câu ngắn hoặc các gạch đầu dòng cần thiết.\n- Không suy đoán thông tin cá nhân chưa có trong portfolio.\n- Không lặp lại câu hỏi của người dùng.\n- Trả lời đủ ý nhưng ngắn gọn, tự nhiên và trực tiếp.`,
                   },
                 ],
               },
