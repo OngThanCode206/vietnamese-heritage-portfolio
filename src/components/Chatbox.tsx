@@ -16,11 +16,24 @@ const INITIAL_SUGGESTIONS = [
   "Thành tích & Học vấn của Kỳ?",
 ];
 
-// Cập nhật danh sách model Gemini chuẩn, ổn định để tránh lỗi 404
+/*
+ * ============================================================
+ * GEMINI MODEL
+ * ============================================================
+ *
+ * Gemini 1.5 Flash / Pro đã bị Google shutdown.
+ *
+ * Model hiện tại:
+ * gemini-3.8-flash
+ *
+ * Có fallback để nếu model đầu tiên lỗi 404 thì thử
+ * model tiếp theo.
+ */
 const CANDIDATE_MODELS = [
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
-  "gemini-pro",
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
 ];
 
 export function Chatbox() {
@@ -29,25 +42,35 @@ export function Chatbox() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       sender: "ai",
-      text: "Dạ em xin chào Anh/Chị! Em là **Trợ lý ảo CKy** — đại diện thông tin cho **Võ Lê Cao Kỳ**. Anh/Chị cần em hỗ trợ thông tin gì về học vấn, kinh nghiệm hay các dự án của Kỳ ạ? 👋\n\n💡 **Anh/Chị có thể chọn nhanh các gợi ý bên dưới:**",
+      text:
+        "Dạ em xin chào Anh/Chị! Em là **Trợ lý ảo CKy** — đại diện thông tin cho **Võ Lê Cao Kỳ**. Anh/Chị cần em hỗ trợ thông tin gì về học vấn, kinh nghiệm hay các dự án của Kỳ ạ? 👋\n\n💡 **Anh/Chị có thể chọn nhanh các gợi ý bên dưới:**",
       timestamp: "",
     },
   ]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  /*
+   * ============================================================
+   * INITIALIZATION
+   * ============================================================
+   */
   useEffect(() => {
-    // Khởi tạo timestamp cho tin nhắn chào mừng ở phía client để tránh lỗi hydration mismatch
+    // Khởi tạo timestamp cho tin nhắn chào mừng
     setMessages((prev) =>
       prev.map((msg) =>
         msg.id === "welcome"
           ? {
               ...msg,
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              timestamp: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
             }
           : msg
       )
@@ -56,15 +79,28 @@ export function Chatbox() {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
+
     return () => clearInterval(timer);
   }, []);
 
+  /*
+   * ============================================================
+   * AUTO SCROLL
+   * ============================================================
+   */
   useEffect(() => {
     if (isOpen) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      chatEndRef.current?.scrollIntoView({
+        behavior: "smooth",
+      });
     }
   }, [messages, isLoading, isOpen]);
 
+  /*
+   * ============================================================
+   * FORMAT TIME
+   * ============================================================
+   */
   const formatLiveTime = (date: Date) => {
     return date
       .toLocaleTimeString("en-US", {
@@ -75,168 +111,653 @@ export function Chatbox() {
       .toLowerCase();
   };
 
+  /*
+   * ============================================================
+   * FORMAT DATE
+   * ============================================================
+   */
   const formatLiveDate = (date: Date) => {
     const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
+
     return `${day}/${month}/${year}`;
   };
 
-  const fetchGeminiStream = async (apiKey: string, apiContents: any[]) => {
+  /*
+   * ============================================================
+   * GEMINI API STREAM
+   * ============================================================
+   */
+  const fetchGeminiStream = async (
+    apiKey: string,
+    apiContents: any[]
+  ): Promise<Response> => {
     let lastErrorStatus = 0;
+    let lastErrorMessage = "";
 
     for (const modelName of CANDIDATE_MODELS) {
       try {
+        console.log(
+          `[Gemini] Đang gọi model: ${modelName}`
+        );
+
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+
             body: JSON.stringify({
               systemInstruction: {
-                parts: [{ text: SYSTEM_INSTRUCTION }],
+                parts: [
+                  {
+                    text: SYSTEM_INSTRUCTION,
+                  },
+                ],
               },
+
               contents: apiContents,
+
               generationConfig: {
-                temperature: 0.6,
                 maxOutputTokens: 2048,
               },
             }),
           }
         );
 
+        console.log(
+          `[Gemini] ${modelName} -> HTTP ${response.status}`
+        );
+
+        /*
+         * Model không tồn tại
+         * -> thử model tiếp theo
+         */
         if (response.status === 404) {
-          console.warn(`Model ${modelName} bị 404, tự động đổi sang model tiếp theo...`);
           lastErrorStatus = 404;
+
+          const errorText = await response.text().catch(() => "");
+
+          lastErrorMessage = errorText;
+
+          console.warn(
+            `[Gemini] Model ${modelName} trả về 404. Thử model tiếp theo...`
+          );
+
           continue;
         }
 
+        /*
+         * API key sai / không hợp lệ
+         */
+        if (response.status === 400 || response.status === 401) {
+          const errorText = await response.text().catch(() => "");
+
+          console.error(
+            `[Gemini] API Key hoặc request không hợp lệ:`,
+            errorText
+          );
+
+          throw new Error(
+            `Gemini API Error ${response.status}: ${errorText}`
+          );
+        }
+
+        /*
+         * Quota
+         */
+        if (response.status === 429) {
+          const errorText = await response.text().catch(() => "");
+
+          console.warn(
+            `[Gemini] Rate limit / quota exceeded:`,
+            errorText
+          );
+
+          throw new Error(
+            `Gemini API đang quá tải hoặc hết quota. HTTP 429`
+          );
+        }
+
+        /*
+         * Các lỗi khác
+         */
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "");
+
+          console.error(
+            `[Gemini] HTTP ${response.status}:`,
+            errorText
+          );
+
+          throw new Error(
+            `Gemini API Error ${response.status}: ${errorText}`
+          );
+        }
+
+        /*
+         * Thành công
+         */
+        console.log(
+          `[Gemini] Kết nối thành công với model: ${modelName}`
+        );
+
         return response;
-      } catch (err) {
-        console.error(`Lỗi kết nối tới model ${modelName}:`, err);
+      } catch (error) {
+        /*
+         * Nếu là lỗi HTTP do API trả về thì throw luôn
+         * để không fallback sai.
+         */
+        if (
+          error instanceof Error &&
+          error.message.startsWith("Gemini API")
+        ) {
+          throw error;
+        }
+
+        console.error(
+          `[Gemini] Lỗi kết nối model ${modelName}:`,
+          error
+        );
+
+        lastErrorMessage =
+          error instanceof Error
+            ? error.message
+            : String(error);
       }
     }
 
-    throw new Error(`Tất cả model đều không khả dụng (Status: ${lastErrorStatus})`);
+    throw new Error(
+      `Không có model Gemini nào khả dụng. Status: ${lastErrorStatus}. ${lastErrorMessage}`
+    );
   };
 
-  const handleSend = async (textToSend?: string, retryCount = 0) => {
+  /*
+   * ============================================================
+   * SEND MESSAGE
+   * ============================================================
+   */
+  const handleSend = async (
+    textToSend?: string,
+    retryCount = 0
+  ) => {
     const query = textToSend || input;
-    if (!query.trim() || isLoading) return;
 
+    if (!query.trim() || isLoading) {
+      return;
+    }
+
+    const cleanQuery = query.trim();
+
+    /*
+     * ============================================================
+     * USER MESSAGE
+     * ============================================================
+     */
     const userMsg: Message = {
       id: Date.now().toString(),
       sender: "user",
-      text: query.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      text: cleanQuery,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     };
 
-    const aiMsgId = (Date.now() + 1).toString();
+    /*
+     * ID của AI message
+     */
+    const aiMsgId = `${Date.now()}-ai`;
+
     const initialAiMsg: Message = {
       id: aiMsgId,
       sender: "ai",
       text: "",
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     };
 
+    /*
+     * ============================================================
+     * BUILD CHAT HISTORY
+     * ============================================================
+     */
     const historyContents = messages
-      .filter((m) => m.id !== "welcome" && m.text.trim() !== "")
+      .filter(
+        (m) =>
+          m.id !== "welcome" &&
+          m.text.trim() !== ""
+      )
       .map((m) => ({
         role: m.sender === "user" ? "user" : "model",
-        parts: [{ text: m.text }],
+
+        parts: [
+          {
+            text: m.text,
+          },
+        ],
       }));
 
+    /*
+     * Thêm câu hỏi hiện tại
+     */
     const apiContents = [
       ...historyContents,
+
       {
         role: "user",
-        parts: [{ text: query.trim() }],
+
+        parts: [
+          {
+            text: cleanQuery,
+          },
+        ],
       },
     ];
 
+    /*
+     * ============================================================
+     * UPDATE UI
+     * ============================================================
+     */
     if (retryCount === 0) {
-      setMessages((prev) => [...prev, userMsg, initialAiMsg]);
-      if (!textToSend) setInput("");
-    } else {
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === aiMsgId ? { ...msg, text: "" } : msg))
-      );
+      setMessages((prev) => [
+        ...prev,
+        userMsg,
+        initialAiMsg,
+      ]);
+
+      if (!textToSend) {
+        setInput("");
+      }
     }
 
     setIsLoading(true);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      /*
+       * ========================================================
+       * GET API KEY
+       * ========================================================
+       */
+      const apiKey =
+        import.meta.env.VITE_GEMINI_API_KEY;
 
       if (!apiKey) {
-        throw new Error("Missing VITE_GEMINI_API_KEY in .env");
+        throw new Error(
+          "Missing VITE_GEMINI_API_KEY in .env"
+        );
       }
 
-      const response = await fetchGeminiStream(apiKey, apiContents);
+      /*
+       * Debug
+       *
+       * Không in API key ra console.
+       */
+      console.log(
+        "[Gemini] API Key:",
+        apiKey.substring(0, 6) + "******"
+      );
 
-      if (response.status === 429 && retryCount < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 4000));
-        return handleSend(query, retryCount + 1);
+      /*
+       * ========================================================
+       * CALL GEMINI
+       * ========================================================
+       */
+      const response = await fetchGeminiStream(
+        apiKey,
+        apiContents
+      );
+
+      /*
+       * ========================================================
+       * RATE LIMIT RETRY
+       * ========================================================
+       */
+      if (
+        response.status === 429 &&
+        retryCount < 2
+      ) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 4000)
+        );
+
+        setIsLoading(false);
+
+        return handleSend(
+          cleanQuery,
+          retryCount + 1
+        );
       }
 
+      /*
+       * ========================================================
+       * CHECK RESPONSE
+       * ========================================================
+       */
       if (!response.ok) {
-        throw new Error(`HTTP Error: ${response.status}`);
+        throw new Error(
+          `HTTP Error: ${response.status}`
+        );
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder("utf-8");
+      /*
+       * ========================================================
+       * STREAM READER
+       * ========================================================
+       */
+      const reader =
+        response.body?.getReader();
+
+      if (!reader) {
+        throw new Error(
+          "Không nhận được response body từ Gemini."
+        );
+      }
+
+      const decoder =
+        new TextDecoder("utf-8");
+
       let accumulatedText = "";
+      let buffer = "";
 
-      if (reader) {
-        let buffer = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+      /*
+       * ========================================================
+       * READ STREAM
+       * ========================================================
+       */
+      while (true) {
+        const { done, value } =
+          await reader.read();
 
-          buffer += decoder.decode(value, { stream: true });
+        if (done) {
+          break;
+        }
 
-          const parts = buffer.split("\n\n");
-          buffer = parts.pop() || "";
+        /*
+         * Decode dữ liệu
+         */
+        buffer += decoder.decode(value, {
+          stream: true,
+        });
 
-          let hasNewText = false;
+        /*
+         * SSE thường phân cách event bằng
+         *
+         * \n\n
+         */
+        const events = buffer.split(
+          "\n\n"
+        );
 
-          for (const part of parts) {
-            const cleanPart = part.trim();
-            if (cleanPart.startsWith("data: ")) {
-              const dataStr = cleanPart.replace(/^data:\s*/, "");
-              if (dataStr === "[DONE]") continue;
+        /*
+         * Giữ lại phần chưa hoàn chỉnh
+         */
+        buffer =
+          events.pop() || "";
 
-              try {
-                const data = JSON.parse(dataStr);
-                const textChunk = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                if (textChunk) {
-                  accumulatedText += textChunk;
-                  hasNewText = true;
-                }
-              } catch {
-                // Đang chờ dữ liệu đủ khung
-              }
-            }
-          }
+        /*
+         * ======================================================
+         * PROCESS EVENTS
+         * ======================================================
+         */
+        for (const event of events) {
+          const lines =
+            event.split("\n");
 
-          if (hasNewText) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
+          for (const line of lines) {
+            const cleanLine =
+              line.trim();
+
+            /*
+             * Bỏ qua các dòng không phải data
+             */
+            if (
+              !cleanLine.startsWith(
+                "data:"
               )
-            );
+            ) {
+              continue;
+            }
+
+            const dataStr =
+              cleanLine
+                .replace(
+                  /^data:\s*/,
+                  ""
+                )
+                .trim();
+
+            if (
+              !dataStr ||
+              dataStr === "[DONE]"
+            ) {
+              continue;
+            }
+
+            try {
+              const data =
+                JSON.parse(dataStr);
+
+              const textChunk =
+                data?.candidates?.[0]
+                  ?.content?.parts?.[0]
+                  ?.text || "";
+
+              if (textChunk) {
+                accumulatedText +=
+                  textChunk;
+
+                /*
+                 * Update UI ngay khi
+                 * nhận được text
+                 */
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === aiMsgId
+                      ? {
+                          ...msg,
+                          text:
+                            accumulatedText,
+                        }
+                      : msg
+                  )
+                );
+              }
+            } catch (parseError) {
+              /*
+               * Không crash nếu một SSE chunk
+               * chưa hoàn chỉnh.
+               */
+              console.warn(
+                "[Gemini] Không parse được SSE chunk:",
+                parseError
+              );
+            }
           }
         }
       }
+
+      /*
+       * ========================================================
+       * PROCESS REMAINING BUFFER
+       * ========================================================
+       */
+      if (buffer.trim()) {
+        const lines =
+          buffer.split("\n");
+
+        for (const line of lines) {
+          const cleanLine =
+            line.trim();
+
+          if (
+            !cleanLine.startsWith(
+              "data:"
+            )
+          ) {
+            continue;
+          }
+
+          const dataStr =
+            cleanLine
+              .replace(
+                /^data:\s*/,
+                ""
+              )
+              .trim();
+
+          if (
+            !dataStr ||
+            dataStr === "[DONE]"
+          ) {
+            continue;
+          }
+
+          try {
+            const data =
+              JSON.parse(dataStr);
+
+            const textChunk =
+              data?.candidates?.[0]
+                ?.content?.parts?.[0]
+                ?.text || "";
+
+            if (textChunk) {
+              accumulatedText +=
+                textChunk;
+            }
+          } catch {
+            // Bỏ qua chunk cuối không hoàn chỉnh
+          }
+        }
+      }
+
+      /*
+       * ========================================================
+       * FINAL UI UPDATE
+       * ========================================================
+       */
+      if (accumulatedText.trim()) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMsgId
+              ? {
+                  ...msg,
+                  text:
+                    accumulatedText,
+                }
+              : msg
+          )
+        );
+      } else {
+        throw new Error(
+          "Gemini trả về response nhưng không có nội dung."
+        );
+      }
     } catch (error) {
-      console.error("Chatbox Stream Error:", error);
+      console.error(
+        "[Chatbox] Gemini Stream Error:",
+        error
+      );
+
+      let errorMessage =
+        "Dạ em rất tiếc, hiện tại hệ thống AI đang gặp sự cố. Anh/Chị vui lòng thử lại sau ít giây ạ!";
+
+      /*
+       * ========================================================
+       * FRIENDLY ERROR MESSAGE
+       * ========================================================
+       */
+      if (error instanceof Error) {
+        const message =
+          error.message.toLowerCase();
+
+        /*
+         * API KEY
+         */
+        if (
+          message.includes(
+            "missing vite_gemini_api_key"
+          )
+        ) {
+          errorMessage =
+            "⚠️ Hệ thống chưa tìm thấy **VITE_GEMINI_API_KEY**. Anh/chị kiểm tra file `.env` và restart lại server nhé!";
+        }
+
+        /*
+         * 401 / API KEY
+         */
+        else if (
+          message.includes("401")
+        ) {
+          errorMessage =
+            "⚠️ API Key Gemini không hợp lệ hoặc chưa được cấp quyền. Anh/chị kiểm tra lại **VITE_GEMINI_API_KEY** nhé!";
+        }
+
+        /*
+         * 400
+         */
+        else if (
+          message.includes("400")
+        ) {
+          errorMessage =
+            "⚠️ Request gửi tới Gemini không hợp lệ. Vui lòng kiểm tra cấu hình API.";
+        }
+
+        /*
+         * 429
+         */
+        else if (
+          message.includes("429")
+        ) {
+          errorMessage =
+            "⏳ Gemini đang giới hạn số lượt truy cập. Anh/Chị vui lòng thử lại sau vài giây nhé!";
+        }
+
+        /*
+         * 404
+         */
+        else if (
+          message.includes("404")
+        ) {
+          errorMessage =
+            "⚠️ Model Gemini hiện tại không khả dụng. Vui lòng kiểm tra model/API version.";
+        }
+
+        /*
+         * API ERROR
+         */
+        else if (
+          message.includes(
+            "gemini api error"
+          )
+        ) {
+          errorMessage =
+            "⚠️ Gemini API đang trả về lỗi. Anh/Chị vui lòng thử lại sau ít giây nhé!";
+        }
+      }
+
+      /*
+       * ========================================================
+       * SHOW ERROR IN CHAT
+       * ========================================================
+       */
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMsgId
             ? {
                 ...msg,
                 text:
-                  "Dạ em rất tiếc, hệ thống đang bận do có nhiều lượt truy cập cùng lúc. Anh/Chị vui lòng thử lại sau vài giây hoặc liên hệ trực tiếp với anh Kỳ qua Email **nky57412@gmail.com** nhé ạ!",
+                  errorMessage +
+                  "\n\nNếu cần hỗ trợ trực tiếp, Anh/Chị có thể liên hệ anh Kỳ qua Email **nky57412@gmail.com** nhé ạ!",
               }
             : msg
         )
@@ -246,12 +767,26 @@ export function Chatbox() {
     }
   };
 
+  /*
+   * ============================================================
+   * RENDER
+   * ============================================================
+   */
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
+
+      {/* ======================================================
+          CHAT CLOUD
+      ====================================================== */}
       {showCloud && !isOpen && (
         <div className="relative mb-2 flex items-center gap-1.5 rounded-2xl border-2 border-primary/40 bg-card px-3 py-1.5 shadow-[4px_4px_0_0_var(--gold)] text-xs font-bold text-primary animate-bounce">
+
           <Sparkles className="h-3.5 w-3.5 text-gold" />
-          <span>Trợ lý ảo CKy</span>
+
+          <span>
+            Trợ lý ảo CKy
+          </span>
+
           <button
             type="button"
             onClick={(e) => {
@@ -263,48 +798,84 @@ export function Chatbox() {
           >
             <X className="h-3 w-3" />
           </button>
+
           <div className="absolute -bottom-2 right-5 h-0 w-0 border-x-8 border-x-transparent border-t-8 border-t-card" />
         </div>
       )}
 
+      {/* ======================================================
+          CHAT BOX
+      ====================================================== */}
       {isOpen && (
         <div className="mb-2 flex h-[520px] w-[350px] sm:w-[390px] flex-col overflow-hidden rounded-2xl border-2 border-primary/40 bg-card/95 backdrop-blur-md shadow-[8px_8px_0_0_var(--gold)] transition-all animate-in fade-in zoom-in-95 duration-200">
+
+          {/* ==================================================
+              HEADER
+          ================================================== */}
           <div className="flex items-center justify-between border-b-2 border-primary/20 bg-primary px-4 py-3 text-primary-foreground">
+
             <div className="flex items-center gap-2.5">
+
               <div className="relative flex h-8 w-8 items-center justify-center rounded-full border border-gold bg-card text-primary">
+
                 <Bot className="h-4 w-4" />
+
                 <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card animate-pulse" />
               </div>
+
               <div>
                 <h3 className="font-display text-sm font-extrabold leading-none tracking-wide text-primary-foreground">
                   Trợ lý ảo CKy
                 </h3>
+
                 <p className="mt-1 flex items-center gap-1 text-[10px] opacity-90">
                   <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
                   Đang hoạt động
                 </p>
               </div>
             </div>
+
             <button
               type="button"
-              onClick={() => setIsOpen(false)}
+              onClick={() =>
+                setIsOpen(false)
+              }
               className="rounded-lg p-1 text-primary-foreground/80 transition-colors hover:bg-card/20 hover:text-primary-foreground"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
+          {/* ==================================================
+              MESSAGE AREA
+          ================================================== */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
             {messages.map((m) => {
-              if (m.sender === "ai" && !m.text && isLoading) return null;
+
+              /*
+               * Không hiển thị AI message rỗng
+               * trong lúc loading
+               */
+              if (
+                m.sender === "ai" &&
+                !m.text &&
+                isLoading
+              ) {
+                return null;
+              }
 
               return (
                 <div
                   key={m.id}
                   className={`flex items-start gap-2.5 ${
-                    m.sender === "user" ? "flex-row-reverse" : "flex-row"
+                    m.sender === "user"
+                      ? "flex-row-reverse"
+                      : "flex-row"
                   }`}
                 >
+
+                  {/* AVATAR */}
                   <div
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
                       m.sender === "user"
@@ -312,8 +883,14 @@ export function Chatbox() {
                         : "border-gold bg-accent text-accent-foreground"
                     }`}
                   >
-                    {m.sender === "user" ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                    {m.sender === "user" ? (
+                      <User className="h-3.5 w-3.5" />
+                    ) : (
+                      <Bot className="h-3.5 w-3.5" />
+                    )}
                   </div>
+
+                  {/* MESSAGE */}
                   <div
                     className={`group relative max-w-[82%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
                       m.sender === "user"
@@ -321,9 +898,13 @@ export function Chatbox() {
                         : "bg-secondary/90 border border-primary/20 text-foreground rounded-tl-none shadow-sm"
                     }`}
                   >
+
                     <div className="prose prose-sm max-w-none prose-p:leading-relaxed text-xs dark:prose-invert">
-                      <ReactMarkdown>{m.text}</ReactMarkdown>
+                      <ReactMarkdown>
+                        {m.text}
+                      </ReactMarkdown>
                     </div>
+
                     <span
                       className={`mt-1 block text-[9px] opacity-60 ${
                         m.sender === "user"
@@ -333,46 +914,73 @@ export function Chatbox() {
                     >
                       {m.timestamp}
                     </span>
+
                   </div>
                 </div>
               );
             })}
 
-            {isLoading && !messages[messages.length - 1]?.text && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gold bg-accent">
-                  <Bot className="h-3.5 w-3.5 text-accent-foreground" />
+            {/* =================================================
+                LOADING
+            ================================================= */}
+            {isLoading &&
+              !messages[messages.length - 1]?.text && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gold bg-accent">
+                    <Bot className="h-3.5 w-3.5 text-accent-foreground" />
+                  </div>
+
+                  <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-primary/20 bg-secondary/80 px-4 py-2.5">
+
+                    <span className="text-[11px] font-medium text-muted-foreground mr-1">
+                      CKy đang trả lời
+                    </span>
+
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
+
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.2s]" />
+
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.4s]" />
+
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-primary/20 bg-secondary/80 px-4 py-2.5">
-                  <span className="text-[11px] font-medium text-muted-foreground mr-1">
-                    CKy đang trả lời
-                  </span>
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.2s]" />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.4s]" />
-                </div>
-              </div>
-            )}
+              )}
+
             <div ref={chatEndRef} />
+
           </div>
 
+          {/* ==================================================
+              QUICK SUGGESTIONS
+          ================================================== */}
           {messages.length <= 1 && (
             <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-              {INITIAL_SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => handleSend(s)}
-                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-all hover:border-gold hover:text-primary hover:shadow-sm"
-                >
-                  <Sparkles className="h-2.5 w-2.5 text-gold" />
-                  {s}
-                </button>
-              ))}
+
+              {INITIAL_SUGGESTIONS.map(
+                (s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() =>
+                      handleSend(s)
+                    }
+                    className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-all hover:border-gold hover:text-primary hover:shadow-sm"
+                  >
+                    <Sparkles className="h-2.5 w-2.5 text-gold" />
+                    {s}
+                  </button>
+                )
+              )}
+
             </div>
           )}
 
+          {/* ==================================================
+              INPUT
+          ================================================== */}
           <div className="border-t-2 border-primary/20 bg-card p-3">
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -380,42 +988,71 @@ export function Chatbox() {
               }}
               className="flex items-center gap-2"
             >
+
               <input
                 type="text"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) =>
+                  setInput(e.target.value)
+                }
                 placeholder="Hỏi trợ lý CKy bất kỳ thông tin nào..."
                 className="flex-1 rounded-xl border border-primary/30 bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
+
               <button
                 type="submit"
-                disabled={!input.trim() || isLoading}
+                disabled={
+                  !input.trim() ||
+                  isLoading
+                }
                 className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 <Send className="h-4 w-4" />
               </button>
+
             </form>
+
           </div>
         </div>
       )}
 
+      {/* ======================================================
+          CHAT BUTTON
+      ====================================================== */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() =>
+          setIsOpen(!isOpen)
+        }
         className="group relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
         aria-label="Toggle Chat"
       >
-        {isOpen ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6 transition-transform group-hover:rotate-12" />}
+        {isOpen ? (
+          <X className="h-6 w-6" />
+        ) : (
+          <Bot className="h-6 w-6 transition-transform group-hover:rotate-12" />
+        )}
       </button>
 
+      {/* ======================================================
+          CLOCK
+      ====================================================== */}
       <div className="mt-2 flex flex-col items-center rounded-lg border border-primary/20 bg-card/90 px-2.5 py-1 text-center font-mono shadow-sm backdrop-blur-sm">
+
         <span className="text-[11px] font-bold text-foreground leading-none">
-          {formatLiveTime(currentTime)}
+          {formatLiveTime(
+            currentTime
+          )}
         </span>
+
         <span className="mt-0.5 text-[10px] text-muted-foreground leading-none">
-          {formatLiveDate(currentTime)}
+          {formatLiveDate(
+            currentTime
+          )}
         </span>
+
       </div>
+
     </div>
   );
 }
