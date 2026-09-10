@@ -16,11 +16,10 @@ const INITIAL_SUGGESTIONS = [
   "Thành tích & Học vấn của Kỳ?",
 ];
 
-// Danh sách các Model Gemini từ mới nhất/mạnh nhất đến dự phòng
+// Cập nhật danh sách model Gemini chuẩn, ổn định để tránh lỗi 404
 const CANDIDATE_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash-latest",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
   "gemini-pro",
 ];
 
@@ -35,13 +34,25 @@ export function Chatbox() {
       id: "welcome",
       sender: "ai",
       text: "Dạ em xin chào Anh/Chị! Em là **Trợ lý ảo CKy** — đại diện thông tin cho **Võ Lê Cao Kỳ**. Anh/Chị cần em hỗ trợ thông tin gì về học vấn, kinh nghiệm hay các dự án của Kỳ ạ? 👋\n\n💡 **Anh/Chị có thể chọn nhanh các gợi ý bên dưới:**",
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      timestamp: "",
     },
   ]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Khởi tạo timestamp cho tin nhắn chào mừng ở phía client để tránh lỗi hydration mismatch
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === "welcome"
+          ? {
+              ...msg,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            }
+          : msg
+      )
+    );
+
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
@@ -71,7 +82,6 @@ export function Chatbox() {
     return `${day}/${month}/${year}`;
   };
 
-  // Hàm tự động thử lần lượt từng model nếu gặp lỗi 404
   const fetchGeminiStream = async (apiKey: string, apiContents: any[]) => {
     let lastErrorStatus = 0;
 

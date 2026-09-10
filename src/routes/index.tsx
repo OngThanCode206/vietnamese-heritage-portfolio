@@ -61,8 +61,10 @@ export const Route = createFileRoute("/")({
 
 function useTheme() {
   const [dark, setDark] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const saved = localStorage.getItem("theme");
     const isDark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
     setDark(isDark);
@@ -78,7 +80,7 @@ function useTheme() {
     });
   };
 
-  return { dark, toggle };
+  return { dark: mounted ? dark : false, toggle };
 }
 
 function MusicPlayer() {
@@ -89,11 +91,18 @@ function MusicPlayer() {
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   const playerRef = useRef<any>(null);
   const currentTrack: Track = PLAYLIST[currentIndex] ?? PLAYLIST[0] ?? { title: "", id: "" };
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
     const initPlayer = () => {
       if (playerRef.current) return;
       playerRef.current = new window.YT.Player("yt-audio-element", {
@@ -131,9 +140,11 @@ function MusicPlayer() {
     } else {
       initPlayer();
     }
-  }, []);
+  }, [isMounted]);
 
   useEffect(() => {
+    if (!isReady) return;
+
     const startAudioOnInteraction = () => {
       if (playerRef.current && playerRef.current.playVideo && !isPlaying) {
         playerRef.current.playVideo();
@@ -226,6 +237,8 @@ function MusicPlayer() {
     const secs = Math.floor(time % 60);
     return `${mins < 10 ? "0" : ""}${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
+
+  if (!isMounted) return null;
 
   return (
     <div className="relative inline-block">
