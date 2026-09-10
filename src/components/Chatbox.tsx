@@ -63,19 +63,6 @@ export function Chatbox() {
     return `${day}/${month}/${year}`;
   };
 
-  const parseAndAppendChunk = (line: string): string => {
-    const cleanLine = line.replace(/\r$/, "").trim();
-    if (!cleanLine.startsWith("data: ")) return "";
-    const jsonStr = cleanLine.replace(/^data:\s*/, "").trim();
-    if (jsonStr === "[DONE]") return "";
-    try {
-      const data = JSON.parse(jsonStr);
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    } catch {
-      return "";
-    }
-  };
-
   const handleSend = async (textToSend?: string, retryCount = 0) => {
     const query = textToSend || input;
     if (!query.trim() || isLoading) return;
@@ -128,8 +115,9 @@ export function Chatbox() {
         throw new Error("Missing VITE_GEMINI_API_KEY in .env");
       }
 
+      // Đổi thành gemini-1.5-flash để stream ổn định và nhanh nhất
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -140,60 +128,64 @@ export function Chatbox() {
             contents: apiContents,
             generationConfig: {
               temperature: 0.6,
-              maxOutputTokens: 1000,
+              maxOutputTokens: 4096, // Đã tăng token lên mức cao để không bị cắt ngang câu
             },
           }),
         }
       );
 
-      // Nếu gặp lỗi 429 (vượt giới hạn quota), tự động chờ 5 giây rồi thử lại tối đa 2 lần
       if (response.status === 429 && retryCount < 2) {
-        console.warn(`API quá tải (429), đang tự động thử lại lần ${retryCount + 1}...`);
         await new Promise((resolve) => setTimeout(resolve, 5000));
         return handleSend(query, retryCount + 1);
       }
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("API Error:", errorText);
         throw new Error(`HTTP Error: ${response.status}`);
       }
 
       const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      const decoder = new TextDecoder("utf-8");
       let accumulatedText = "";
 
       if (reader) {
         let buffer = "";
         while (true) {
           const { done, value } = await reader.read();
-
-          if (done) {
-            if (buffer.trim()) {
-              accumulatedText += parseAndAppendChunk(buffer.trim());
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
-                )
-              );
-            }
-            break;
-          }
+          if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
+          
+          // Thuật toán tách SSE chuẩn bằng 2 dấu xuống dòng (\n\n) giúp không bị vỡ JSON
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || "";
 
-          for (const line of lines) {
-            const chunkText = parseAndAppendChunk(line);
-            if (chunkText) {
-              accumulatedText += chunkText;
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
-                )
-              );
+          let hasNewText = false;
+          
+          for (const part of parts) {
+            const cleanPart = part.trim();
+            if (cleanPart.startsWith("data: ")) {
+              const dataStr = cleanPart.replace(/^data:\s*/, "");
+              if (dataStr === "[DONE]") continue;
+              
+              try {
+                const data = JSON.parse(dataStr);
+                const textChunk = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                if (textChunk) {
+                  accumulatedText += textChunk;
+                  hasNewText = true;
+                }
+              } catch (e) {
+                console.warn("Chunk delay, waiting for next packet...");
+              }
             }
+          }
+
+          if (hasNewText) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg
+              )
+            );
           }
         }
       }
