@@ -137,131 +137,104 @@ async function readErrorBody(response: Response): Promise<string> {
   }
 }
 
-async function fetchGeminiStream(
+async function fetchGeminiText(
   apiKey: string,
   apiContents: Array<{
     role: "user" | "model";
     parts: Array<{ text: string }>;
   }>,
   signal: AbortSignal
-): Promise<Response> {
+): Promise<string> {
   let lastStatus = 0;
   let lastBody = "";
 
   for (const modelName of GEMINI_MODELS) {
-    for (let attempt = 0; attempt < MAX_RETRIES_PER_MODEL; attempt++) {
+    try {
+      const controller = new AbortController();
+      const handleAbort = () => controller.abort();
+      signal.addEventListener("abort", handleAbort, { once: true });
+
+      const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+      let response: Response;
+
       try {
-        // Không để request treo vô hạn: nếu Gemini không trả byte đầu tiên
-        // trong 15 giây, chuyển nhanh sang model dự phòng.
-        const requestController = new AbortController();
-        let timedOut = false;
-
-        const handleAbort = () => requestController.abort();
-        signal.addEventListener("abort", handleAbort, { once: true });
-
-        const timeoutId = window.setTimeout(() => {
-          timedOut = true;
-          requestController.abort();
-        }, REQUEST_TIMEOUT_MS);
-
-        let response: Response;
-
-        try {
-          response = await fetch(
-            `${API_BASE_URL}/${modelName}:streamGenerateContent?alt=sse`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-goog-api-key": apiKey,
+        // Dùng generateContent thay vì streamGenerateContent.
+        // Chatbox vẫn có hiệu ứng gõ chữ ở UI, nhưng tránh lỗi SSE/buffering
+        // khiến bubble AI bị rỗng hoặc loading vô hạn trên browser/Vercel.
+        response = await fetch(
+          `${API_BASE_URL}/${modelName}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: SYSTEM_INSTRUCTION }],
               },
-              body: JSON.stringify({
-                systemInstruction: {
-                  parts: [{ text: SYSTEM_INSTRUCTION }],
+              contents: apiContents,
+              generationConfig: {
+                thinkingConfig: {
+                  thinkingLevel: "low",
                 },
-                contents: apiContents,
-                generationConfig: {
-                  // Portfolio chatbot ưu tiên tốc độ hơn reasoning sâu.
-                  thinkingConfig: {
-                    thinkingLevel: "low",
-                  },
-                  maxOutputTokens: 1200,
-                },
-              }),
-              signal: requestController.signal,
-            }
-          );
-        } finally {
-          window.clearTimeout(timeoutId);
-          signal.removeEventListener("abort", handleAbort);
-        }
-
-        if (timedOut) {
-          lastStatus = 503;
-          lastBody = "Request timeout";
-          break;
-        }
-
-        if (response.ok) {
-          return response;
-        }
-
-        lastStatus = response.status;
-        lastBody = await readErrorBody(response);
-
-        // Các lỗi này không nên fallback mù quáng.
-        if (
-          response.status === 400 ||
-          response.status === 401 ||
-          response.status === 403
-        ) {
-          throw new Error(getApiErrorMessage(response.status, lastBody));
-        }
-
-        // Model không tồn tại / không còn hỗ trợ -> thử model tiếp theo.
-        if (response.status === 404) {
-          break;
-        }
-
-        // 503 = model/provider đang quá tải: fallback ngay để tránh
-        // trạng thái "CKy đang trả lời..." kéo dài hàng chục giây.
-        if (response.status === 503) {
-          break;
-        }
-
-        // Các lỗi tạm thời khác chỉ retry tối đa một lần rồi fallback.
-        if (RETRYABLE_STATUS.has(response.status)) {
-          if (attempt < MAX_RETRIES_PER_MODEL - 1) {
-            await sleep(RETRY_DELAYS_MS[attempt] ?? 700);
-            continue;
+                maxOutputTokens: 700,
+              },
+            }),
+            signal: controller.signal,
           }
-
-          break;
-        }
-
-        // Lỗi khác: trả response để caller xử lý message.
-        return response;
-      } catch (error) {
-        if (isAbortError(error)) {
-          throw error;
-        }
-
-        if (
-          error instanceof Error &&
-          error.message.startsWith("Gemini API Error")
-        ) {
-          throw error;
-        }
-
-        lastBody = error instanceof Error ? error.message : String(error);
-
-        if (attempt < MAX_RETRIES_PER_MODEL - 1) {
-          await sleep(RETRY_DELAYS_MS[attempt] ?? 900);
-          continue;
-        }
-
-        break;
+        );
+      } finally {
+        window.clearTimeout(timeoutId);
+        signal.removeEventListener("abort", handleAbort);
       }
+
+      if (response.ok) {
+        const data = await response.json();
+        const parts = data?.candidates?.[0]?.content?.parts;
+        const text = Array.isArray(parts)
+          ? parts
+              .map((part: { text?: unknown }) =>
+                typeof part?.text === "string" ? part.text : ""
+              )
+              .join("")
+              .trim()
+          : "";
+
+        if (text) return text;
+
+        throw new Error("Gemini trả về response nhưng không có nội dung.");
+      }
+
+      lastStatus = response.status;
+      lastBody = await readErrorBody(response);
+
+      if (response.status === 400 || response.status === 401 || response.status === 403) {
+        throw new Error(getApiErrorMessage(response.status, lastBody));
+      }
+
+      // 404/429/5xx: thử model tiếp theo. 503 không retry cùng model để
+      // tránh người dùng phải chờ quá lâu khi backend đang quá tải.
+      continue;
+    } catch (error) {
+      if (isAbortError(error)) {
+        if (signal.aborted) throw error;
+
+        lastStatus = 504;
+        lastBody = "Request timeout";
+        continue;
+      }
+
+      if (
+        error instanceof Error &&
+        error.message.startsWith("Gemini API Error")
+      ) {
+        throw error;
+      }
+
+      lastBody = error instanceof Error ? error.message : String(error);
+      continue;
     }
   }
 
@@ -483,95 +456,20 @@ export function Chatbox() {
       abortControllerRef.current = controller;
 
       try {
-        const response = await fetchGeminiStream(
+        const answerText = await fetchGeminiText(
           apiKey,
           apiContents,
           controller.signal
         );
 
-        if (!response.ok) {
-          const body = await readErrorBody(response);
-          throw new Error(getApiErrorMessage(response.status, body));
-        }
-
-        if (!response.body) {
-          throw new Error("Gemini không trả về response body.");
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-
-        let buffer = "";
-        let accumulatedText = "";
-        let receivedText = false;
-
-        // Gemini stream thường trả về theo "chunk" gồm nhiều ký tự.
-        // Queue này biến chunk thành hiệu ứng gõ từng ký tự ở UI.
-        let typingQueue = "";
-        let typingWorker: Promise<void> | null = null;
-
-        const startTypewriter = () => {
-          if (typingWorker) return;
-
-          typingWorker = (async () => {
-            while (typingQueue.length > 0) {
-              const char = typingQueue.charAt(0);
-              typingQueue = typingQueue.slice(1);
-              accumulatedText += char;
-              updateMessage(aiMsgId, accumulatedText);
-
-              // ~10ms/ký tự: vẫn có hiệu ứng gõ nhưng không làm câu trả lời bị kéo dài.
-              await sleep(10);
-            }
-
-            typingWorker = null;
-          })();
-        };
-
-        const processEvent = (event: string) => {
-          const chunk = extractTextFromSseEvent(event);
-
-          if (!chunk) return;
-
-          receivedText = true;
-          typingQueue += chunk;
-          startTypewriter();
-        };
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-
-            const events = buffer.split(/\r?\n\r?\n/);
-            buffer = events.pop() ?? "";
-
-            for (const event of events) {
-              processEvent(event);
-            }
-          }
-
-          buffer += decoder.decode();
-
-          if (buffer.trim()) {
-            processEvent(buffer);
-          }
-
-          // Chờ UI gõ hết queue trước khi kết thúc trạng thái loading.
-          if (typingWorker) {
-            await typingWorker;
-          }
-        } finally {
-          reader.releaseLock();
-        }
-
-        if (!receivedText || !accumulatedText.trim()) {
-          throw new Error(
-            "Gemini trả về response nhưng không có nội dung."
-          );
+        // API trả về trọn câu trả lời một lần; phần này tạo hiệu ứng gõ
+        // từng ký tự mà không phụ thuộc SSE/buffering của browser.
+        let typedText = "";
+        for (const char of answerText) {
+          if (controller.signal.aborted) return;
+          typedText += char;
+          updateMessage(aiMsgId, typedText);
+          await sleep(8);
         }
       } catch (error) {
         if (isAbortError(error)) {
