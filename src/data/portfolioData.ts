@@ -146,16 +146,37 @@ export const content: Record<Lang, Content> = {
       },
     ],
     skills: [
-      { group: "Ngôn ngữ", items: ["Java", "C/C++", "Python", "SQL", "JavaScript", "C#"] },
-      { group: "Framework & Tech", items: ["Spring Boot", "Spring Security", "Thymeleaf", "JPA/Hibernate"] },
-      { group: "Tools & Hardware", items: ["MySQL", "Git", "ESP32", "Arduino", "Raspberry Pi"] },
+      {
+        group: "Ngôn ngữ Lập trình",
+        items: ["C", "C++", "C#", "Java", "Python", "SQL", "JavaScript", "HTML / CSS"],
+      },
+      {
+        group: "Web Development & Kiến trúc",
+        items: ["Spring Boot", "Spring MVC", "Spring Security", "Thymeleaf", "Bootstrap", "REST API", "MVC", "RBAC", "CRUD"],
+      },
+      {
+        group: "Database & Chuyên môn",
+        items: ["MySQL", "JPA / Hibernate", "AI / Machine Learning", "IoT & Embedded", "Robotics"],
+      },
+      {
+        group: "Công cụ & Phần mềm",
+        items: ["Git / GitHub", "IntelliJ IDEA", "VS Code", "Maven", "Apache NetBeans IDE", "Arduino", "ESP32"],
+      },
+      {
+        group: "Kỹ năng Tin học & Quản lý",
+        items: [
+          "Thành thạo MS Word, Excel, PowerPoint",
+          "MS Project (Quản lý & theo dõi tiến độ dự án)",
+          "Soạn thảo tài liệu, làm báo cáo & slide thuyết trình chuyên nghiệp",
+        ],
+      },
     ],
     achievements: [
       { year: "2026", title: "Học bổng DB Global Dream Leader" },
       { year: "2025", title: "Bài báo khoa học công bố (Dự án IECMS)" },
       { year: "2025", title: 'Giải Ba — Rung Chuông Vàng "Tìm hiểu ASEAN"' },
       { year: "2025", title: "Giải Khuyến khích — AIoT Innoworks" },
-      { year: "2025", title: "Chứng chỉ WISE-IoT WISE-PASS Core Level 1 & Level 2" },
+      { year: "2025", title: "Chứng chỉ WISE-IoT WISE-PaaS Core Level 1 & Level 2" },
     ],
   },
 
@@ -241,16 +262,37 @@ export const content: Record<Lang, Content> = {
       },
     ],
     skills: [
-      { group: "Languages", items: ["Java", "C/C++", "Python", "SQL"] },
-      { group: "Frameworks & Tech", items: ["Spring Boot", "Spring Security", "Thymeleaf", "JPA/Hibernate"] },
-      { group: "Tools & Hardware", items: ["MySQL", "Git", "ESP32", "Arduino", "Raspberry Pi"] },
+      {
+        group: "Programming Languages",
+        items: ["C", "C++", "C#", "Java", "Python", "SQL", "JavaScript", "HTML / CSS"],
+      },
+      {
+        group: "Web Development & Architecture",
+        items: ["Spring Boot", "Spring MVC", "Spring Security", "Thymeleaf", "Bootstrap", "REST API", "MVC", "RBAC", "CRUD"],
+      },
+      {
+        group: "Database & Core Knowledge",
+        items: ["MySQL", "JPA / Hibernate", "AI / Machine Learning", "IoT & Embedded", "Robotics"],
+      },
+      {
+        group: "Software & Tools",
+        items: ["Git / GitHub", "IntelliJ IDEA", "VS Code", "Maven", "Apache NetBeans IDE", "Arduino", "ESP32"],
+      },
+      {
+        group: "Office & Project Management",
+        items: [
+          "Proficient in MS Word, Excel, PowerPoint",
+          "MS Project (Project scheduling & management)",
+          "Professional documentation, reporting & presentation slides",
+        ],
+      },
     ],
     achievements: [
       { year: "2026", title: "DB Global Dream Leader Scholarship" },
       { year: "2025", title: "Published scientific paper (IECMS project)" },
       { year: "2025", title: 'Third Prize — "Understanding ASEAN" Golden Bell contest' },
       { year: "2025", title: "Consolation Prize — AIoT Innoworks" },
-      { year: "—", title: "WISE-IoT WISE-PASS Core Level 1 & Level 2 certificates" },
+      { year: "2025", title: "WISE-IoT WISE-PaaS Core Level 1 & Level 2 certificates" },
     ],
   },
 
@@ -334,16 +376,37 @@ export const content: Record<Lang, Content> = {
       },
     ],
     skills: [
-      { group: "언어", items: ["Java", "C/C++", "Python", "SQL"] },
-      { group: "프레임워크 & 기술", items: ["Spring Boot", "Spring Security", "Thymeleaf", "JPA/Hibernate"] },
-      { group: "도구 & 하드웨어", items: ["MySQL", "Git", "ESP32", "Arduino", "Raspberry Pi"] },
+      {
+        group: "프로그래밍 언어",
+        items: ["C", "C++", "C#", "Java", "Python", "SQL", "JavaScript", "HTML / CSS"],
+      },
+      {
+        group: "웹 개발 & 아키텍처",
+        items: ["Spring Boot", "Spring MVC", "Spring Security", "Thymeleaf", "Bootstrap", "REST API", "MVC", "RBAC", "CRUD"],
+      },
+      {
+        group: "데이터베이스 & 전문 지식",
+        items: ["MySQL", "JPA / Hibernate", "AI / 머신러닝", "IoT & 임베디드", "로보틱스"],
+      },
+      {
+        group: "소프트웨어 & 도구",
+        items: ["Git / GitHub", "IntelliJ IDEA", "VS Code", "Maven", "Apache NetBeans IDE", "Arduino", "ESP32"],
+      },
+      {
+        group: "사무 및 프로젝트 관리",
+        items: [
+          "MS Word, Excel, PowerPoint 숙련",
+          "MS Project (일정 및 프로젝트 관리)",
+          "전문 문서 작성, 보고서 작성 및 발표 슬라이드 제작",
+        ],
+      },
     ],
     achievements: [
       { year: "2026", title: "DB Global Dream Leader 장학금" },
       { year: "2025", title: "학술 논문 발표 (IECMS 프로젝트)" },
       { year: "2025", title: '"아세안 알기" 골든벨 3등상' },
       { year: "2025", title: "AIoT Innoworks 장려상" },
-      { year: "—", title: "WISE-IoT WISE-PASS Core Level 1 & 2 자격증" },
+      { year: "2025", title: "WISE-IoT WISE-PaaS Core Level 1 & Level 2 자격증" },
     ],
   },
 };
