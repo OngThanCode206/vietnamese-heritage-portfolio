@@ -26,7 +26,7 @@ export const socials = [
 ];
 
 type Experience = { role: string; org: string; details: string[] };
-type Project = { title: string; role: string; description: string; tags: string[] };
+type Project = { title: string; role: string; period?: string; description: string; tags: string[] };
 type SkillGroup = { group: string; items: string[] };
 type Achievement = { year: string; title: string };
 
@@ -52,13 +52,15 @@ type Content = {
   };
   sections: {
     experience: { eyebrow: string; title: string };
-    projects: { eyebrow: string; title: string };
+    projects: { eyebrow: string; title: string; featuredTitle: string; otherTitle: string };
     skills: { eyebrow: string; title: string };
     achievements: { eyebrow: string; title: string };
     contact: { eyebrow: string; title: string };
   };
   experiences: Experience[];
-  projects: Project[];
+  featuredProjects: Project[];
+  otherProjects: Project[];
+  projects: Project[]; // Tổng hợp cả 2 nhóm dự án
   skills: SkillGroup[];
   achievements: Achievement[];
 };
@@ -94,57 +96,124 @@ export const content: Record<Lang, Content> = {
     },
     sections: {
       experience: { eyebrow: "Work Experiences", title: "Kinh nghiệm làm việc" },
-      projects: { eyebrow: "Projects", title: "Dự án tiêu biểu" },
+      projects: {
+        eyebrow: "Projects",
+        title: "Dự án & Sản phẩm",
+        featuredTitle: "Dự án Tiêu biểu",
+        otherTitle: "Dự án Đã thực hiện",
+      },
       skills: { eyebrow: "Skills", title: "Kỹ năng chuyên môn" },
       achievements: { eyebrow: "Achievements", title: "Thành tích & Chứng chỉ" },
       contact: { eyebrow: "Contact", title: "Kết nối với mình" },
     },
     experiences: [
       {
-        role: "Cựu thành viên Ban Kỹ thuật",
-        org: "Công ty TNHH META SQUARE",
+        role: "Liên chi Hội Trưởng",
+        org: "Trường Đại học Công nghệ TP.HCM - HUTECH (2026 - Hiện tại)",
         details: [
-          "Bảo trì Drone và thiết bị Robotics.",
-          "Giảng dạy STEM tại VAS & Royal School.",
-          "Trưởng nhóm dự án Web Quản lý sinh viên và Web bán khóa học.",
+          "Thành viên BTC Lễ hội Văn hóa Việt - Hàn năm 2025 do Viện Công nghệ Việt Hàn phối hợp cùng Học viện King Sejong Hồ Chí Minh 3 tổ chức.",
+          "Thành viên BTC chiến dịch Xuân tình nguyện 2026 do Viện Công nghệ Việt Hàn tổ chức tại Đắk Nông.",
+          "Thành viên BTC chuỗi hoạt động Hành trình khám phá di sản do Viện Công nghệ Việt Hàn tổ chức.",
         ],
       },
       {
         role: "Thành viên Ban Kỹ thuật",
-        org: "Viện Trí tuệ Nhân tạo — ĐH Hùng Vương",
-        details: ["Tham gia nghiên cứu và triển khai các dự án ứng dụng Trí tuệ Nhân tạo."],
+        org: "Viện Trí tuệ Nhân tạo — ĐH Hùng Vương (2026 - Hiện tại)",
+        details: [
+          "Hỗ trợ nghiên cứu, phát triển các dự án học thuật và bảo trì sửa chữa các thiết bị công nghệ.",
+          "Tổ chức các cuộc thi học thuật công nghệ tại các trường đại học và THPT.",
+          "Rèn luyện tư duy logic, sáng tạo, kỹ năng thiết kế hệ thống, lập trình và vận hành công nghệ.",
+        ],
+      },
+      {
+        role: "Cựu thành viên Ban Kỹ thuật",
+        org: "Công ty TNHH META SQUARE (2024 - 2026)",
+        details: [
+          "Bảo trì, sửa chữa và phục hồi các thiết bị công nghệ như Drone và Robotics.",
+          "Hỗ trợ giảng dạy và hướng dẫn thực hành công nghệ STEM cho học sinh tại các trường quốc tế như VAS và Royal School.",
+          "Đảm nhiệm vai trò trưởng nhóm trong dự án phát triển phần mềm: Web Quản lý sinh viên và Web bán khóa học.",
+        ],
       },
     ],
-    projects: [
+    featuredProjects: [
       {
-        title: "IECMS — Hệ thống giám sát tiêu thụ năng lượng thông minh",
-        role: "Trưởng nhóm",
+        title: "IECMS — Hệ thống Giám sát Tiêu thụ Năng lượng Thông minh",
+        role: "Trưởng nhóm phát triển",
+        period: "08/2025 – 03/2026",
         description:
-          "Hệ thống giám sát tiêu thụ năng lượng ứng dụng IoT (ESP32) kết hợp AI phân tích, cảnh báo. Đã công bố bài báo khoa học năm 2025.",
+          "Hệ thống giám sát tiêu thụ năng lượng ứng dụng IoT (ESP32) kết hợp AI phân tích, cảnh báo tự động. Đã công bố bài báo khoa học năm 2025.",
         tags: ["IoT", "ESP32", "AI", "Nghiên cứu khoa học"],
       },
       {
-        title: "Web Quản lý Nhân viên",
-        role: "Full-stack",
+        title: "Website Quản lý Nhân viên",
+        role: "Full-stack Developer",
+        period: "04/2026 – 07/2026",
         description:
-          "Ứng dụng Java Spring Boot MVC với Spring Security phân quyền RBAC, JPA/Hibernate và cơ sở dữ liệu MySQL.",
+          "Hệ thống quản lý nhân sự Web bằng Java Spring Boot MVC & MySQL, tích hợp Spring Security phân quyền RBAC (3 vai trò Admin, Manager, Employee), JPA/Hibernate, Thymeleaf và Bootstrap.",
         tags: ["Spring Boot", "Spring Security", "JPA/Hibernate", "MySQL"],
       },
       {
-        title: "Mô hình Dự đoán Thị trường Chứng khoán",
-        role: "AI Developer",
+        title: "Mô hình Thuật toán Dự đoán Thị trường Chứng khoán",
+        role: "Trưởng nhóm phát triển AI",
+        period: "05/2026 – Hiện tại",
         description:
-          "Thuật toán AI dự đoán xu hướng thị trường dựa trên dữ liệu lịch sử giá và khối lượng giao dịch.",
-        tags: ["Python", "Machine Learning", "Data"],
+          "Nghiên cứu và phát triển mô hình Machine Learning dự đoán xu hướng thị trường chứng khoán dựa trên dữ liệu lịch sử giá và khối lượng giao dịch.",
+        tags: ["Python", "Machine Learning", "Data Analysis"],
       },
       {
-        title: "Xe dò line tự động & Camera AI nhận diện",
-        role: "Embedded",
+        title: "Camera AI & Xe Dò Line Tự Động",
+        role: "Trưởng nhóm / Embedded & AI",
+        period: "06/2025 – 2026",
         description:
-          "Xe tự hành dò line kết hợp camera nhận diện đối tượng bằng thị giác máy tính trên nền tảng nhúng.",
-        tags: ["Arduino", "Raspberry Pi", "Computer Vision"],
+          "Phát triển hệ thống Camera AI nhận diện và giám sát hình ảnh kết hợp xe tự hành dò line thông qua thuật toán điều khiển và cảm biến nhúng.",
+        tags: ["Computer Vision", "Arduino", "Raspberry Pi", "IoT/Embedded"],
       },
     ],
+    otherProjects: [
+      {
+        title: "Robot Hỗ trợ Dịch vụ Hành chính Công",
+        role: "Trưởng nhóm phát triển",
+        period: "05/2024",
+        description:
+          "Quản lý thiết kế và lập trình robot hỗ trợ điều hướng, hướng dẫn và tương tác tự động trong môi trường dịch vụ hành chính công.",
+        tags: ["Robotics", "Embedded", "Control Systems"],
+      },
+      {
+        title: "Nghiên cứu Sóng Não & Ứng dụng Công nghệ",
+        role: "Trưởng nhóm nghiên cứu",
+        period: "08/2025 – 09/2025",
+        description:
+          "Nghiên cứu nguyên lý hoạt động của sóng não (EEG) và khả năng ứng dụng trong AI, điều khiển thiết bị và tương tác người - máy (HCI).",
+        tags: ["AI Research", "Bio-Signal Processing", "HCI"],
+      },
+      {
+        title: "Nghiên cứu & Phát triển Drone & Robotics",
+        role: "Thành viên Ban Kỹ thuật",
+        period: "01/2025 – 05/2025",
+        description:
+          "Bảo trì, sửa chữa, vận hành Drone và hệ thống Robotics; nghiên cứu giải pháp tự động hóa phục vụ học tập và thi đấu công nghệ tại HUTECH.",
+        tags: ["Drone", "Robotics", "Automation"],
+      },
+      {
+        title: "Hệ thống Quản lý Sinh viên",
+        role: "Trưởng nhóm phát triển",
+        period: "02/2024 – 04/2024",
+        description:
+          "Thiết kế và phát triển hệ thống quản lý sinh viên hỗ trợ quản lý thông tin, điểm số, quá trình học tập và tối ưu hóa cơ sở dữ liệu.",
+        tags: ["Web Development", "Database", "Management System"],
+      },
+      {
+        title: "Website Bán Khóa Học Trực Tuyến",
+        role: "Trưởng nhóm phát triển",
+        period: "02/2024 – 04/2024",
+        description:
+          "Xây dựng nền tảng E-learning hỗ trợ đăng ký, quản lý khóa học, tài khoản người dùng và tích hợp thanh toán cơ bản.",
+        tags: ["Web Development", "UI/UX", "E-learning"],
+      },
+    ],
+    get projects() {
+      return [...this.featuredProjects, ...this.otherProjects];
+    },
     skills: [
       {
         group: "Ngôn ngữ Lập trình",
@@ -210,57 +279,124 @@ export const content: Record<Lang, Content> = {
     },
     sections: {
       experience: { eyebrow: "Work Experiences", title: "Work experience" },
-      projects: { eyebrow: "Projects", title: "Featured projects" },
+      projects: {
+        eyebrow: "Projects",
+        title: "Projects & Products",
+        featuredTitle: "Featured Projects",
+        otherTitle: "Completed Projects",
+      },
       skills: { eyebrow: "Skills", title: "Technical skills" },
       achievements: { eyebrow: "Achievements", title: "Awards & certificates" },
       contact: { eyebrow: "Contact", title: "Let's connect" },
     },
     experiences: [
       {
-        role: "Former Technical Team Member",
-        org: "META SQUARE Co., Ltd.",
+        role: "Head of Student Association Branch",
+        org: "Ho Chi Minh City University of Technology - HUTECH (2026 - Present)",
         details: [
-          "Maintained drones and robotics equipment.",
-          "Taught STEM classes at VAS & Royal School.",
-          "Team lead for a student management web app and an online course platform.",
+          "Organizing Committee member for the 2025 Viet - Han Cultural Festival co-organized by VKIT and King Sejong Institute HCM 3.",
+          "Organizing Committee member for the 2026 Spring Volunteer Campaign organized by VKIT in Dak Nong.",
+          "Organizing Committee member for the Heritage Discovery Journey activity series organized by VKIT.",
         ],
       },
       {
         role: "Technical Team Member",
-        org: "Artificial Intelligence Institute — Hung Vuong University",
-        details: ["Researched and deployed applied artificial intelligence projects."],
+        org: "Artificial Intelligence Institute — Hung Vuong University (2026 - Present)",
+        details: [
+          "Supported academic project R&D and tech equipment maintenance & repair.",
+          "Organized academic technology competitions for universities and high schools.",
+          "Enhanced logical thinking, project management, system design, and technical operation skills.",
+        ],
+      },
+      {
+        role: "Former Technical Team Member",
+        org: "META SQUARE Co., Ltd. (2024 - 2026)",
+        details: [
+          "Maintained, repaired, and restored technology equipment including Drones and Robotics.",
+          "Assisted in teaching and guiding STEM tech practice for students at international schools (VAS, Royal School).",
+          "Served as Team Lead for software development projects: Student Management Web App & Course Selling Web App.",
+        ],
       },
     ],
-    projects: [
+    featuredProjects: [
       {
         title: "IECMS — Intelligent Energy Consumption Monitoring System",
-        role: "Team Leader",
+        role: "Development Team Lead",
+        period: "Aug 2025 – Mar 2026",
         description:
-          "IoT energy monitoring system (ESP32) with AI-based analysis and alerting. Scientific paper published in 2025.",
-        tags: ["IoT", "ESP32", "AI", "Research"],
+          "Smart IoT energy monitoring system (ESP32) combined with AI analysis and automatic alerting. Scientific paper published in 2025.",
+        tags: ["IoT", "ESP32", "AI", "Scientific Research"],
       },
       {
-        title: "Employee Management Web App",
-        role: "Full-stack",
+        title: "Employee Management Web Application",
+        role: "Full-stack Developer",
+        period: "Apr 2026 – Jul 2026",
         description:
-          "Java Spring Boot MVC application with Spring Security RBAC, JPA/Hibernate and a MySQL database.",
+          "Web HR management system built with Java Spring Boot MVC & MySQL, Spring Security (3-role RBAC: Admin, Manager, Employee), JPA/Hibernate, Thymeleaf & Bootstrap.",
         tags: ["Spring Boot", "Spring Security", "JPA/Hibernate", "MySQL"],
       },
       {
-        title: "Stock Market Prediction Model",
-        role: "AI Developer",
+        title: "Stock Market Prediction Algorithm Model",
+        role: "AI Development Lead",
+        period: "May 2026 – Present",
         description:
-          "AI algorithm predicting market trends from historical price and trading volume data.",
-        tags: ["Python", "Machine Learning", "Data"],
+          "Researched and developed Machine Learning models to predict stock market trends based on historical price and volume data.",
+        tags: ["Python", "Machine Learning", "Data Analysis"],
       },
       {
-        title: "Line-following Car & AI Vision Camera",
-        role: "Embedded",
+        title: "AI Camera & Autonomous Line-Following Vehicle",
+        role: "Team Lead / Embedded & AI",
+        period: "Jun 2025 – 2026",
         description:
-          "Autonomous line-following vehicle with computer-vision object recognition on an embedded platform.",
-        tags: ["Arduino", "Raspberry Pi", "Computer Vision"],
+          "Developed AI Camera system for object recognition and surveillance, combined with autonomous line-following vehicle using sensor control algorithms.",
+        tags: ["Computer Vision", "Arduino", "Raspberry Pi", "Embedded"],
       },
     ],
+    otherProjects: [
+      {
+        title: "Public Administrative Service Support Robot",
+        role: "Development Team Lead",
+        period: "May 2024",
+        description:
+          "Designed and programmed a service robot supporting navigation, guidance, and automated interaction in public administrative environments.",
+        tags: ["Robotics", "Embedded", "Control Systems"],
+      },
+      {
+        title: "Brainwave Research & Tech Application",
+        role: "Research Team Lead",
+        period: "Aug 2025 – Sep 2025",
+        description:
+          "Investigated EEG brainwave principles and their applications in AI, hardware control, and Human-Computer Interaction (HCI).",
+        tags: ["AI Research", "Bio-Signal Processing", "HCI"],
+      },
+      {
+        title: "Drone & Robotics R&D",
+        role: "Technical Team Member",
+        period: "Jan 2025 – May 2025",
+        description:
+          "Maintained, repaired, and operated Drones & Robotics systems; researched automation solutions for tech competitions at HUTECH.",
+        tags: ["Drone", "Robotics", "Automation"],
+      },
+      {
+        title: "Student Management System",
+        role: "Development Team Lead",
+        period: "Feb 2024 – Apr 2024",
+        description:
+          "Designed and built a student management web application for tracking student info, grades, academic records, and database optimization.",
+        tags: ["Web Development", "Database", "Management System"],
+      },
+      {
+        title: "Online Course Platform",
+        role: "Development Team Lead",
+        period: "Feb 2024 – Apr 2024",
+        description:
+          "Developed an E-learning web platform supporting course registration, content management, user accounts, and basic payments.",
+        tags: ["Web Development", "UI/UX", "E-learning"],
+      },
+    ],
+    get projects() {
+      return [...this.featuredProjects, ...this.otherProjects];
+    },
     skills: [
       {
         group: "Programming Languages",
@@ -326,55 +462,124 @@ export const content: Record<Lang, Content> = {
     },
     sections: {
       experience: { eyebrow: "Work Experiences", title: "업무 경력" },
-      projects: { eyebrow: "Projects", title: "주요 프로젝트" },
+      projects: {
+        eyebrow: "Projects",
+        title: "프로젝트 및 제품",
+        featuredTitle: "주요 프로젝트",
+        otherTitle: "수행 프로젝트",
+      },
       skills: { eyebrow: "Skills", title: "전문 역량" },
       achievements: { eyebrow: "Achievements", title: "수상 및 자격증" },
       contact: { eyebrow: "Contact", title: "연락처" },
     },
     experiences: [
       {
-        role: "전 기술팀 팀원",
-        org: "META SQUARE 유한회사",
+        role: "학생회 연합회장",
+        org: "호치민 기술대학교 - HUTECH (2026 - 현재)",
         details: [
-          "드론 및 로보틱스 장비 유지보수.",
-          "VAS 및 Royal School에서 STEM 강의.",
-          "학생 관리 웹과 온라인 강의 판매 웹 프로젝트 팀장.",
+          "2025 한-베 문화 축제 조직위원회 위원 (한베기술원 및 세종학당 호치민3 공동 주최).",
+          "2026 닥농성 봄 자원봉사 캠페인 조직위원회 위원.",
+          "문화유산 탐방 여정 활동 시리즈 조직위원회 위원.",
         ],
       },
       {
         role: "기술팀 팀원",
-        org: "인공지능 연구소 — 훙브엉 대학교",
-        details: ["인공지능 응용 프로젝트 연구 및 구축 참여."],
+        org: "인공지능 연구소 — 훙브엉 대학교 (2026 - 현재)",
+        details: [
+          "학술 연구 프로젝트 개발 지원 및 기술 장비 유지보수·수리.",
+          "대학교 및 고등학교 대상 기술 학술 경진대회 개최.",
+          "프로젝트 관리, 시스템 설계, 프로그래밍 및 기술 운영 역량 강화.",
+        ],
+      },
+      {
+        role: "전 기술팀 팀원",
+        org: "META SQUARE 유한회사 (2024 - 2026)",
+        details: [
+          "드론 및 로보틱스 기술 장비 유지보수, 수리 및 복원.",
+          "국제학교(VAS, Royal School) 학생 대상 STEM 기술 실습 지도 및 강의 지원.",
+          "소프트웨어 개발 프로젝트 팀장: 학생 관리 웹 애플리케이션 및 강좌 판매 웹.",
+        ],
       },
     ],
-    projects: [
+    featuredProjects: [
       {
         title: "IECMS — 지능형 에너지 소비 모니터링 시스템",
-        role: "팀장",
+        role: "개발 팀장",
+        period: "2025.08 – 2026.03",
         description:
-          "ESP32 기반 IoT 에너지 모니터링에 AI 분석과 경보를 결합한 시스템. 2025년 학술 논문 발표.",
-        tags: ["IoT", "ESP32", "AI", "연구"],
+          "ESP32 기반 IoT 에너지 모니터링에 AI 분석과 자동 경보를 결합한 시스템. 2025년 학술 논문 발표.",
+        tags: ["IoT", "ESP32", "AI", "학술 연구"],
       },
       {
         title: "직원 관리 웹 애플리케이션",
-        role: "풀스택",
+        role: "풀스택 개발자",
+        period: "2026.04 – 2026.07",
         description:
-          "Spring Security RBAC, JPA/Hibernate, MySQL을 사용한 Java Spring Boot MVC 애플리케이션.",
+          "Java Spring Boot MVC & MySQL 기반 인사 관리 웹 시스템. Spring Security (Admin, Manager, Employee 3단계 RBAC), JPA/Hibernate, Thymeleaf, Bootstrap 적용.",
         tags: ["Spring Boot", "Spring Security", "JPA/Hibernate", "MySQL"],
       },
       {
-        title: "주식 시장 예측 모델",
-        role: "AI 개발자",
-        description: "과거 가격과 거래량 데이터를 기반으로 시장 추세를 예측하는 AI 알고리즘.",
-        tags: ["Python", "Machine Learning", "Data"],
+        title: "주식 시장 예측 알고리즘 모델",
+        role: "AI 개발 팀장",
+        period: "2026.05 – 현재",
+        description:
+          "과거 주가 및 거래량 데이터를 기반으로 주식 시장 추세를 예측하는 머신러닝 모델 연구 및 개발.",
+        tags: ["Python", "Machine Learning", "Data Analysis"],
       },
       {
-        title: "라인 트레이싱 자동차 & AI 인식 카메라",
-        role: "임베디드",
-        description: "임베디드 플랫폼에서 컴퓨터 비전 객체 인식을 결합한 자율 라인 트레이싱 차량.",
-        tags: ["Arduino", "Raspberry Pi", "Computer Vision"],
+        title: "AI 카메라 & 자율 라인 트레이싱 차량",
+        role: "팀장 / 임베디드 & AI",
+        period: "2025.06 – 2026",
+        description:
+          "객체 인식 및 감시용 AI 카메라 시스템 개발과 센서 제어 알고리즘 기반 자율 주행 라인 트레이서 결합.",
+        tags: ["Computer Vision", "Arduino", "Raspberry Pi", "Embedded"],
       },
     ],
+    otherProjects: [
+      {
+        title: "공공 행정 서비스 지원 로봇",
+        role: "프로젝트 팀장",
+        period: "2024.05",
+        description:
+          "공공 행정 환경에서 자동 안내, 위치 유도 및 상호작용을 지원하는 서비스 로봇 설계 및 제어 프로그래밍.",
+        tags: ["Robotics", "Embedded", "Control Systems"],
+      },
+      {
+        title: "뇌파 연구 및 기술 응용",
+        role: "연구 팀장",
+        period: "2025.08 – 2025.09",
+        description:
+          "뇌파(EEG) 작동 원리 분석 및 AI, 제어 시스템, 인간-컴퓨터 상호작용(HCI) 분야 응용 연구.",
+        tags: ["AI Research", "Bio-Signal Processing", "HCI"],
+      },
+      {
+        title: "드론 & 로보틱스 연구개발(R&D)",
+        role: "기술팀 팀원",
+        period: "2025.01 – 2025.05",
+        description:
+          "드론 및 로봇 시스템 유지보수·수리·운용, HUTECH 기술 경진대회 참가를 위한 자동화 솔루션 연구.",
+        tags: ["Drone", "Robotics", "Automation"],
+      },
+      {
+        title: "학생 관리 시스템",
+        role: "프로젝트 팀장",
+        period: "2024.02 – 2024.04",
+        description:
+          "학생 정보, 성적, 학업 과정 관리 및 데이터베이스 최적화를 지원하는 학생 관리 웹 시스템 구축.",
+        tags: ["Web Development", "Database", "Management System"],
+      },
+      {
+        title: "온라인 강좌 판매 웹사이트",
+        role: "프로젝트 팀장",
+        period: "2024.02 – 2024.04",
+        description:
+          "강좌 수강 신청, 콘텐츠 관리, 사용자 계정 및 기본 결제 기능을 지원하는 이러닝 플랫폼 개발.",
+        tags: ["Web Development", "UI/UX", "E-learning"],
+      },
+    ],
+    get projects() {
+      return [...this.featuredProjects, ...this.otherProjects];
+    },
     skills: [
       {
         group: "프로그래밍 언어",
