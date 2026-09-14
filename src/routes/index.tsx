@@ -765,7 +765,7 @@ function Portfolio() {
             };
 
             const desc = isString
-              ? defaultDescriptions[title] || "Sở thích và nguồn cảm hứng giải trí hàng ngày."
+              ? defaultDescriptions[title] || "Trải nghiệm văn hóa ẩm thực và ghi lại khoảnh khắc đẹp."
               : item.description || item.detail;
 
             return (

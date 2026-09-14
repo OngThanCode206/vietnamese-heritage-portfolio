@@ -14,6 +14,8 @@ const INITIAL_SUGGESTIONS = [
   "Kỳ đang làm vị trí gì?",
   "Dự án tiêu biểu của Kỳ?",
   "Thành tích & Học vấn của Kỳ?",
+  "Kỳ có kinh nghiệm gì về AI & IoT?",
+  "Kỳ có sở thích gì ngoài công việc?",
 ];
 
 /**
@@ -545,12 +547,12 @@ export function Chatbox() {
         .slice(-8);
 
       const historyContents = recentMessages.map((message) => ({
-          role:
-            message.sender === "user"
-              ? ("user" as const)
-              : ("model" as const),
-          parts: [{ text: message.text }],
-        }));
+        role:
+          message.sender === "user"
+            ? ("user" as const)
+            : ("model" as const),
+        parts: [{ text: message.text }],
+      }));
 
       const languageLabel =
         responseLanguage === "en"
@@ -826,7 +828,7 @@ export function Chatbox() {
                 maxLength={500}
                 autoComplete="off"
                 placeholder="Hỏi trợ lý CKy bất kỳ thông tin nào..."
-                className="flex-1 rounded-xl border border-primary/30 bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 rounded-xl border border-primary/30 bg-background px-3.5 py-2 text-base sm:text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Nội dung câu hỏi"
               />
 
