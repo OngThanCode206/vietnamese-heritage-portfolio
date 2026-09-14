@@ -164,7 +164,7 @@ function MusicPlayer() {
     }
   }, [isMounted]);
 
-  // Bắt sự kiện tương tác đầu tiên của người dùng để phát nhạc (tránh bị trình duyệt chặn Autoplay)
+  // Khởi tạo audio khi có tương tác đầu tiên
   useEffect(() => {
     if (!isReady) return;
 
@@ -192,7 +192,7 @@ function MusicPlayer() {
     };
   }, [isReady]);
 
-  // Cập nhật tiến trình phát nhạc
+  // Cập nhật tiến trình bài hát
   useEffect(() => {
     let interval: any;
     if (isPlaying && playerRef.current) {
@@ -419,7 +419,8 @@ function Portfolio() {
     { id: "du-an", label: t.nav.projects },
     { id: "ky-nang", label: t.nav.skills },
     { id: "thanh-tich", label: t.nav.achievements },
-    { id: "hoat-dong", label: t.nav.activities ?? "Hoạt động" },
+    { id: "hoat-dong", label: (t.nav as any).activities ?? "Hoạt động" },
+    { id: "so-thich", label: (t.nav as any).interests ?? (t.nav as any).hobbies ?? "Sở thích" },
     { id: "lien-he", label: t.nav.contact },
   ];
 
@@ -731,6 +732,61 @@ function Portfolio() {
           </div>
         </Section>
       )}
+
+      {/* SECTION SỞ THÍCH CÁ NHÂN */}
+      <Section
+        id="so-thich"
+        eyebrow={(t.sections as any)?.hobbies?.eyebrow ?? "Cá nhân"}
+        title={(t.sections as any)?.hobbies?.title ?? "Sở thích cá nhân"}
+      >
+        <div className="grid gap-6 sm:grid-cols-3">
+          {((t as any).interests ?? (t as any).hobbies ?? [
+            "⚽ Bóng đá",
+            "✈️ Đi du lịch",
+            "🍲 Ăn uống",
+          ]).map((item: any, idx: number) => {
+            const isString = typeof item === "string";
+
+            // Tự động bóc tách Icon và Tiêu đề nếu item là chuỗi dạng "⚽ Bóng đá"
+            let icon = isString
+              ? item.match(/\p{Extended_Pictographic}/u)?.[0] || "✨"
+              : item.icon;
+            let title = isString
+              ? item.replace(/\p{Extended_Pictographic}/u, "").trim()
+              : item.title || item.name;
+
+            // Mô tả nội dung mặc định cho từng sở thích
+            const defaultDescriptions: Record<string, string> = {
+              "Bóng đá":
+                "Theo dõi các trận cầu sôi động, giao lưu và rèn luyện thể lực cùng tinh thần đồng đội.",
+              "Đi du lịch":
+                "Khám phá những vùng đất mới, trải nghiệm văn hóa ẩm thực và ghi lại khoảnh khắc đẹp.",
+              "Ăn uống":
+                "Thưởng thức ẩm thực đa dạng, khám phá các quán ăn ngon và đặc sản các vùng miền.",
+            };
+
+            const desc = isString
+              ? defaultDescriptions[title] || "Sở thích và nguồn cảm hứng giải trí hàng ngày."
+              : item.description || item.detail;
+
+            return (
+              <article key={title || idx} className={cardClass}>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 border-primary/40 bg-accent/20 text-2xl">
+                    {icon}
+                  </span>
+                  <h3 className="font-display text-lg font-extrabold text-primary">
+                    {title}
+                  </h3>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {desc}
+                </p>
+              </article>
+            );
+          })}
+        </div>
+      </Section>
 
       {/* SECTION LIÊN HỆ */}
       <Section id="lien-he" eyebrow={t.sections.contact.eyebrow} title={t.sections.contact.title}>
