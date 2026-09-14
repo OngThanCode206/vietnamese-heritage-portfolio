@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Send, Bot, User, Sparkles } from "lucide-react";
+import { X, Send, User, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { SYSTEM_INSTRUCTION } from "../config/aiPrompt";
+import chatAvatar from "@/assets/dai_dien_chatbox.png";
 
 interface Message {
   id: string;
@@ -665,8 +666,12 @@ export function Chatbox() {
         >
           <div className="flex items-center justify-between border-b-2 border-primary/20 bg-primary px-4 py-3 text-primary-foreground">
             <div className="flex items-center gap-2.5">
-              <div className="relative flex h-8 w-8 items-center justify-center rounded-full border border-gold bg-card text-primary">
-                <Bot className="h-4 w-4" />
+              <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-gold bg-card text-primary">
+                <img
+                  src={chatAvatar}
+                  alt="Trợ lý ảo CKy"
+                  className="h-full w-full object-cover"
+                />
 
                 <span
                   className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-card ${
@@ -723,7 +728,7 @@ export function Chatbox() {
                   }`}
                 >
                   <div
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border text-xs font-bold ${
                       message.sender === "user"
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-gold bg-accent text-accent-foreground"
@@ -732,7 +737,11 @@ export function Chatbox() {
                     {message.sender === "user" ? (
                       <User className="h-3.5 w-3.5" />
                     ) : (
-                      <Bot className="h-3.5 w-3.5" />
+                      <img
+                        src={chatAvatar}
+                        alt="Trợ lý CKy"
+                        className="h-full w-full object-cover"
+                      />
                     )}
                   </div>
 
@@ -776,8 +785,12 @@ export function Chatbox() {
             {isLoading &&
               !messages[messages.length - 1]?.text && (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gold bg-accent">
-                    <Bot className="h-3.5 w-3.5 text-accent-foreground" />
+                  <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-gold bg-accent">
+                    <img
+                      src={chatAvatar}
+                      alt="Trợ lý CKy"
+                      className="h-full w-full object-cover"
+                    />
                   </div>
 
                   <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-primary/20 bg-secondary/80 px-4 py-2.5">
@@ -848,14 +861,18 @@ export function Chatbox() {
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
-        className="group relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-all duration-300 hover:scale-105 active:scale-95"
+        className="group relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-all duration-300 hover:scale-105 active:scale-95"
         aria-label={isOpen ? "Đóng trợ lý ảo" : "Mở trợ lý ảo"}
         aria-expanded={isOpen}
       >
         {isOpen ? (
           <X className="h-6 w-6" />
         ) : (
-          <Bot className="h-6 w-6 transition-transform group-hover:rotate-12" />
+          <img
+            src={chatAvatar}
+            alt="Mở trợ lý ảo"
+            className="h-full w-full object-cover transition-transform group-hover:scale-110"
+          />
         )}
       </button>
 
