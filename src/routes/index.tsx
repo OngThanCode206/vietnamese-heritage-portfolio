@@ -1,12 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import {
-  Moon,
-  Sun,
-  Globe,
-  Menu,
-  X,
-} from "lucide-react";
+import { Moon, Sun, Globe, Menu, X } from "lucide-react";
 import { content, languages, profile, socials, type Lang } from "@/data/portfolioData";
 import mapPoster from "@/assets/viet-map-poster.png";
 import motifs from "@/assets/retro-space-motifs.png";
@@ -127,8 +121,8 @@ function Portfolio() {
     { id: "du-an", label: t.nav.projects },
     { id: "ky-nang", label: t.nav.skills },
     { id: "thanh-tich", label: t.nav.achievements },
-    { id: "hoat-dong", label: (t.nav as any).activities ?? "Hoạt động" },
-    { id: "so-thich", label: (t.nav as any).interests ?? (t.nav as any).hobbies ?? "Sở thích" },
+    { id: "hoat-dong", label: t.nav.activities },
+    { id: "so-thich", label: t.ui.interestsTitle },
     { id: "lien-he", label: t.nav.contact },
   ];
 
@@ -157,7 +151,7 @@ function Portfolio() {
             ))}
           </nav>
 
-          {/* Cụm nút công cụ giữ nguyên bên phải */}
+          {/* Cụm nút công cụ bên phải */}
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {/* Chọn ngôn ngữ */}
             <div
@@ -193,10 +187,10 @@ function Portfolio() {
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
-            {/* Component Audio Player đã được tách riêng */}
+            {/* Audio Player */}
             <AudioPlayer />
 
-            {/* Mobile Nav Toggle - Hiện ở màn hình < XL */}
+            {/* Mobile Nav Toggle */}
             <button
               type="button"
               onClick={() => setMobileNavOpen((prev) => !prev)}
@@ -405,76 +399,52 @@ function Portfolio() {
       </Section>
 
       {/* SECTION HOẠT ĐỘNG & PHONG TRÀO */}
-      {t.activities && (
-        <Section
-          id="hoat-dong"
-          eyebrow={t.sections.activities?.eyebrow ?? "Phong trào"}
-          title={t.sections.activities?.title ?? "Hoạt động & Phong trào"}
-        >
-          <div className="grid gap-6 md:grid-cols-2 items-start">
-            {t.activities.map((act, index) => (
-              <article key={act.title || index} className={cardClass}>
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-display text-lg font-extrabold text-primary">
-                    {act.title}
-                  </h3>
-                  {act.period && (
-                    <span className="shrink-0 rounded-full border-2 border-primary/30 bg-card px-2.5 py-0.5 text-[11px] font-bold text-accent">
-                      {act.period}
-                    </span>
-                  )}
-                </div>
-                {act.role && (
-                  <p className="mt-1 text-xs font-bold uppercase tracking-wider text-accent">
-                    {act.role}
-                  </p>
+      <Section
+        id="hoat-dong"
+        eyebrow={t.sections.activities.eyebrow}
+        title={t.sections.activities.title}
+      >
+        <div className="grid gap-6 md:grid-cols-2 items-start">
+          {t.activities.map((act, index) => (
+            <article key={act.title || index} className={cardClass}>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-display text-lg font-extrabold text-primary">
+                  {act.title}
+                </h3>
+                {act.period && (
+                  <span className="shrink-0 rounded-full border-2 border-primary/30 bg-card px-2.5 py-0.5 text-[11px] font-bold text-accent">
+                    {act.period}
+                  </span>
                 )}
-                <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
-                  {act.details?.map((d, dIdx) => (
-                    <li key={dIdx} className="flex gap-2">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rotate-45 bg-gold" />
-                      {d}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </Section>
-      )}
+              </div>
+              {act.role && (
+                <p className="mt-1 text-xs font-bold uppercase tracking-wider text-accent">
+                  {act.role}
+                </p>
+              )}
+              <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
+                {act.details?.map((d, dIdx) => (
+                  <li key={dIdx} className="flex gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rotate-45 bg-gold" />
+                    {d}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </Section>
 
       {/* SECTION SỞ THÍCH CÁ NHÂN */}
       <Section
         id="so-thich"
-        eyebrow={(t.sections as any)?.hobbies?.eyebrow ?? "Cá nhân"}
-        title={(t.sections as any)?.hobbies?.title ?? "Sở thích cá nhân"}
+        eyebrow="Personal"
+        title={t.ui.interestsTitle}
       >
-        <div className="grid gap-6 sm:grid-cols-3 items-start">
-          {((t as any).interests ?? (t as any).hobbies ?? [
-            "⚽ Bóng đá",
-            "✈️ Đi du lịch",
-            "🍲 Ăn uống",
-          ]).map((item: any, idx: number) => {
-            const isString = typeof item === "string";
-
-            let icon = isString
-              ? item.match(/\p{Extended_Pictographic}/u)?.[0] || "✨"
-              : item.icon;
-            let title = isString
-              ? item.replace(/\p{Extended_Pictographic}/u, "").trim()
-              : item.title || item.name;
-
-            const defaultDescriptions: Record<string, string> = {
-              "Bóng đá": "Theo dõi các trận cầu sôi động, giao lưu và rèn luyện thể lực cùng tinh thần đồng đội.",
-              "Đi du lịch":
-                "Trải nghiệm văn hóa ẩm thực và ghi lại khoảnh khắc đẹp.",
-              "Ăn uống":
-                "Thưởng thức ẩm thực đa dạng, khám phá các quán ăn ngon và đặc sản các vùng miền.",
-            };
-
-            const desc = isString
-              ? defaultDescriptions[title] || "Trải nghiệm văn hóa ẩm thực và ghi lại khoảnh khắc đẹp."
-              : item.description || item.detail;
+        <div className="grid gap-6 md:grid-cols-3">
+          {t.interests.map((item, idx) => {
+            const icon = item.match(/\p{Extended_Pictographic}/u)?.[0] || "✨";
+            const title = item.replace(/\p{Extended_Pictographic}/u, "").trim();
 
             return (
               <article key={title || idx} className={cardClass}>
@@ -486,9 +456,6 @@ function Portfolio() {
                     {title}
                   </h3>
                 </div>
-                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  {desc}
-                </p>
               </article>
             );
           })}
