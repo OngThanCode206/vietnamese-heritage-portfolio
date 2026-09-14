@@ -69,4 +69,33 @@ KỸ NĂNG KỸ THUẬT:
 - Web & Backend: Spring Boot, Spring MVC, Spring Security, JPA/Hibernate, Thymeleaf, Bootstrap, REST API, kiến trúc MVC/RBAC.
 - IoT & Nhúng: ESP32, Arduino, Robotics, Drone, Sensors.
 - Tools & MS Office: Git/GitHub, IntelliJ IDEA, VS Code, Maven, MS Project, Word, Excel, PowerPoint.
+
+HOẠT ĐỘNG PHONG TRÀO & CUỘC THI:
+1. Viện Công nghệ Việt – Hàn, Đại học HUTECH (2024 - 2026): Sinh viên tham gia hoạt động học thuật và phong trào sinh viên
+   - Đạt Giải Ba cuộc thi “Rung Chuông Vàng – Tìm hiểu ASEAN” năm 2025.
+   - Đạt Giải Nhất Bóng đá Viện Công nghệ Việt – Hàn năm 2025.
+   - Được tuyên dương danh hiệu “Sinh viên tiêu biểu trong học tập và rèn luyện năm học 2024 – 2025”.
+   - Tham gia Talkshow “Sinh viên 5 tốt – Thời cơ và Thách thức”.
+   - Tham gia hoạt động tư tưởng trong khuôn khổ Ngày hội “Sinh viên 5 tốt” năm 2025.
+   - Tham gia hoạt động hội nhập “Trình diễn trang phục truyền thống các quốc gia”.
+   - Tham dự Lễ khai mạc, Tuyên dương Thanh niên tiên tiến làm theo lời Bác 2025, Lễ kết nạp Đảng và Triển lãm Ngày hội Sinh viên 5 tốt.
+   - Thành viên BTC của Lễ hội Văn hóa Việt - Hàn năm 2025 do Viện Công nghệ Việt Hàn phối hợp cùng Học viện King Sejong Hồ Chí Minh 3 tổ chức.
+   - Thành viên BTC chiến dịch Xuân tình nguyện 2026 do Viện Công nghệ Việt Hàn tổ chức tại Đắc Nông.
+   - Thành viên BTC của chuỗi hoạt động Hành trình khám phá di sản do Viện Công nghệ Việt Hàn tổ chức.
+   * Kỹ năng & kinh nghiệm đạt được: Phát triển kỹ năng giao tiếp, làm việc nhóm, cộng đồng, tinh thần trách nhiệm, tự chủ, thích nghi, thuyết trình, phản biện và tư duy hội nhập quốc tế.
+
+2. AIoT Innoworks 2025 (08/2025 - 11/2025): Thí sinh tham gia vòng Bán kết
+   - Tham gia nghiên cứu và phát triển ý tưởng sáng tạo phục vụ cuộc thi công nghệ InnoWorks 2025.
+   * Kỹ năng & kinh nghiệm đạt được: Rèn luyện kỹ năng nghiên cứu, phát triển ý tưởng, trình bày dự án, làm việc nhóm và tư duy sáng tạo trong môi trường học thuật.
+
+3. Cuộc thi Ý tưởng Sáng tạo trẻ TP. Hồ Chí Minh lần thứ 17 – 2025 Chủ đề "Ý thức thúc đẩy phong trào Bình Dân học vụ số" (06/2025): Trưởng nhóm tham gia cuộc thi
+   - Tham gia đề xuất và phát triển ý tưởng sáng tạo ứng dụng công nghệ vào thực tiễn.
+   * Kỹ năng & kinh nghiệm đạt được: Phát triển tư duy sáng tạo, kỹ năng nghiên cứu công nghệ, phân tích và xây dựng giải pháp thực tế.
+
+4. Đoàn Trường Đại học Công nghệ TP. Hồ Chí Minh (06/2025): Thí sinh tham gia cuộc thi Chính Luận
+   - Có bài viết tham gia Cuộc thi Chính luận về bảo vệ nền tảng tư tưởng của Đảng trong đoàn viên, thanh thiếu niên lần thứ Nhất năm 2025.
+   * Kỹ năng & kinh nghiệm đạt được: Rèn luyện kỹ năng viết, tư duy phản biện, trình bày quan điểm, nhận thức xã hội và trách nhiệm cộng đồng.
+
+SỞ THÍCH CÁ NHÂN:
+- Bóng đá, đi du lịch, ăn uống.
 `;
