@@ -85,7 +85,7 @@ export const content: Record<Lang, Content> = {
       role: "Sinh viên Công nghệ Thông tin — HUTECH",
       tagline: "AI • IoT / Hệ thống nhúng • Web Developer",
       intro:
-        "Mình theo đuổi con đường kết hợp giữa phần cứng và phần mềm: từ cảm biến ESP32 ngoài đời thực đến hệ thống web Java Spring Boot và các mô hình AI. Định hướng phát triển: AI, IoT/Hệ thống nhúng và Java Web Developer.",
+        " Là một sinh viên Công nghệ Thông tin đầy nhiệt huyết, mình tập trung nghiên cứu sự kết hợp giữa Phần cứng, Phần mềm và Trí tuệ Nhân tạo (AI). Luôn chủ động trong R&D và tích cực thử thách bản thân qua các cuộc thi công nghệ, mình hướng tới việc tạo ra những hệ thống tự động hóa thông minh mang lại giá trị thiết thực cho cộng đồng cũng như sự phát triển lâu dài của bản thân.",
       cv: "Xem CV",
       contactBtn: "Liên hệ",
       musicOn: "Đang phát",
@@ -94,11 +94,11 @@ export const content: Record<Lang, Content> = {
       light: "Chế độ sáng",
       dark: "Chế độ tối",
       language: "Ngôn ngữ",
-      avatarCaption: "HUTECH · Sinh viên CNTT",
+      avatarCaption: " Sinh viên CNTT · HUTECH ",
       interestsTitle: "Sở thích cá nhân",
       hoangSa: "Hoàng Sa",
       truongSa: "Trường Sa",
-      footer: "Võ Lê Cao Kỳ · Sinh viên CNTT HUTECH",
+      footer: "· Sinh viên CNTT HUTECH",
     },
     sections: {
       experience: { eyebrow: "Work Experiences", title: "Kinh nghiệm làm việc" },

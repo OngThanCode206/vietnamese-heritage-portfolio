@@ -405,6 +405,7 @@ function Portfolio() {
     { id: "du-an", label: t.nav.projects },
     { id: "ky-nang", label: t.nav.skills },
     { id: "thanh-tich", label: t.nav.achievements },
+    { id: "hoat-dong", label: t.nav.activities ?? "Hoạt động" },
     { id: "lien-he", label: t.nav.contact },
   ];
 
@@ -639,6 +640,45 @@ function Portfolio() {
           ))}
         </ul>
       </Section>
+
+      {/* SECTION HOẠT ĐỘNG & PHONG TRÀO */}
+      {t.activities && (
+        <Section
+          id="hoat-dong"
+          eyebrow={t.sections.activities?.eyebrow ?? "Phong trào"}
+          title={t.sections.activities?.title ?? "Hoạt động & Phong trào"}
+        >
+          <div className="grid gap-6 md:grid-cols-2">
+            {t.activities.map((act, index) => (
+              <article key={act.title || index} className={cardClass}>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-display text-lg font-extrabold text-primary">
+                    {act.title}
+                  </h3>
+                  {act.period && (
+                    <span className="shrink-0 rounded-full border-2 border-primary/30 bg-card px-2.5 py-0.5 text-[11px] font-bold text-accent">
+                      {act.period}
+                    </span>
+                  )}
+                </div>
+                {act.role && (
+                  <p className="mt-1 text-xs font-bold uppercase tracking-wider text-accent">
+                    {act.role}
+                  </p>
+                )}
+                <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
+                  {act.details?.map((d, dIdx) => (
+                    <li key={dIdx} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rotate-45 bg-gold" />
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section id="lien-he" eyebrow={t.sections.contact.eyebrow} title={t.sections.contact.title}>
         <div className="flex flex-wrap gap-3">
