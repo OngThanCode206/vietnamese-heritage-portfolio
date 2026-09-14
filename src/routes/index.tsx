@@ -11,6 +11,8 @@ import {
   Volume2,
   VolumeX,
   Music,
+  Menu,
+  X,
 } from "lucide-react";
 import { content, languages, profile, socials, type Lang } from "@/data/portfolioData";
 import mapPoster from "@/assets/viet-map-poster.png";
@@ -64,12 +66,6 @@ export const Route = createFileRoute("/")({
         content: "summary_large_image",
       },
     ],
-
-    /*
-     * ==========================================================
-     * FAVICON
-     * ==========================================================
-     */
     links: [
       {
         rel: "icon",
@@ -117,12 +113,15 @@ function MusicPlayer() {
   const [isMounted, setIsMounted] = useState(false);
 
   const playerRef = useRef<any>(null);
+  const isFirstRender = useRef(true);
+
   const currentTrack: Track = PLAYLIST[currentIndex] ?? PLAYLIST[0] ?? { title: "", id: "" };
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Khởi tạo YouTube Player
   useEffect(() => {
     if (!isMounted) return;
 
@@ -150,7 +149,7 @@ function MusicPlayer() {
       });
     };
 
-    if (!window.YT) {
+    if (!window.YT || !window.YT.Player) {
       const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
       const firstScriptTag = document.getElementsByTagName("script")[0];
@@ -165,6 +164,7 @@ function MusicPlayer() {
     }
   }, [isMounted]);
 
+  // Bắt sự kiện tương tác đầu tiên của người dùng để phát nhạc (tránh bị trình duyệt chặn Autoplay)
   useEffect(() => {
     if (!isReady) return;
 
@@ -192,6 +192,7 @@ function MusicPlayer() {
     };
   }, [isReady]);
 
+  // Cập nhật tiến trình phát nhạc
   useEffect(() => {
     let interval: any;
     if (isPlaying && playerRef.current) {
@@ -207,7 +208,13 @@ function MusicPlayer() {
     return () => clearInterval(interval);
   }, [isPlaying]);
 
+  // Chuyển bài hát khi currentIndex thay đổi
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
     if (playerRef.current && playerRef.current.loadVideoById) {
       playerRef.current.loadVideoById(currentTrack.id);
       if (isPlaying) {
@@ -270,6 +277,7 @@ function MusicPlayer() {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
+        aria-label="Mở trình phát nhạc"
         className="inline-flex items-center gap-2 rounded-full border-2 border-primary/70 bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <span className="flex h-3 items-end gap-[2px]" aria-hidden>
@@ -304,6 +312,7 @@ function MusicPlayer() {
               max={duration || 0}
               value={currentTime}
               onChange={handleSeek}
+              aria-label="Thanh thời gian bài hát"
               className="h-1.5 flex-1 cursor-pointer appearance-none rounded-lg bg-primary/20 accent-primary"
             />
             <span className="w-8 text-[10px] font-mono text-muted-foreground">
@@ -317,6 +326,7 @@ function MusicPlayer() {
               onClick={toggleMute}
               className="p-1 text-primary hover:text-accent transition-colors"
               title={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
+              aria-label={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
             >
               {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </button>
@@ -327,6 +337,7 @@ function MusicPlayer() {
                 onClick={handlePrev}
                 className="p-1 text-primary hover:text-accent transition-colors"
                 title="Bài trước"
+                aria-label="Bài trước"
               >
                 <SkipBack className="h-4 w-4" />
               </button>
@@ -336,6 +347,7 @@ function MusicPlayer() {
                 onClick={togglePlay}
                 className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:scale-105 transition-transform"
                 title={isPlaying ? "Tạm dừng" : "Phát"}
+                aria-label={isPlaying ? "Tạm dừng" : "Phát"}
               >
                 {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
               </button>
@@ -345,6 +357,7 @@ function MusicPlayer() {
                 onClick={handleNext}
                 className="p-1 text-primary hover:text-accent transition-colors"
                 title="Bài tiếp"
+                aria-label="Bài tiếp"
               >
                 <SkipForward className="h-4 w-4" />
               </button>
@@ -386,6 +399,7 @@ const cardClass =
 
 function Portfolio() {
   const [lang, setLang] = useState<Lang>("vi");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { dark, toggle } = useTheme();
   const t = content[lang];
 
@@ -420,6 +434,7 @@ function Portfolio() {
             ★ V.L.C.K
           </a>
 
+          {/* Desktop Nav */}
           <nav className="hidden items-center gap-6 lg:flex">
             {nav.map((n) => (
               <a
@@ -433,6 +448,7 @@ function Portfolio() {
           </nav>
 
           <div className="flex items-center gap-2">
+            {/* Choose Language */}
             <div
               className="flex items-center gap-1 rounded-full border-2 border-primary/70 bg-card px-2 py-1"
               aria-label={t.ui.language}
@@ -456,6 +472,7 @@ function Portfolio() {
               ))}
             </div>
 
+            {/* Toggle Theme */}
             <button
               type="button"
               onClick={toggle}
@@ -465,11 +482,42 @@ function Portfolio() {
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
+            {/* Music Player */}
             <MusicPlayer />
+
+            {/* Mobile Nav Toggle */}
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen((prev) => !prev)}
+              aria-label="Menu chuyển hướng"
+              aria-expanded={mobileNavOpen}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary/70 bg-card text-primary lg:hidden"
+            >
+              {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Dropdown */}
+        {mobileNavOpen && (
+          <nav className="border-t border-primary/20 bg-card px-6 py-4 lg:hidden">
+            <div className="flex flex-col gap-3">
+              {nav.map((n) => (
+                <a
+                  key={n.id}
+                  href={`#${n.id}`}
+                  onClick={() => setMobileNavOpen(false)}
+                  className="text-sm font-semibold text-foreground transition-colors hover:text-accent"
+                >
+                  {n.label}
+                </a>
+              ))}
+            </div>
+          </nav>
+        )}
       </header>
 
+      {/* SECTION GIỚI THIỆU */}
       <section id="gioi-thieu" className="relative overflow-hidden scroll-mt-24">
         <div aria-hidden className="pointer-events-none absolute inset-0 flex justify-center">
           <img
@@ -555,6 +603,7 @@ function Portfolio() {
         </div>
       </section>
 
+      {/* SECTION KINH NGHIỆM */}
       <Section
         id="kinh-nghiem"
         eyebrow={t.sections.experience.eyebrow}
@@ -578,6 +627,7 @@ function Portfolio() {
         </div>
       </Section>
 
+      {/* SECTION DỰ ÁN */}
       <Section id="du-an" eyebrow={t.sections.projects.eyebrow} title={t.sections.projects.title}>
         <div className="grid gap-6 md:grid-cols-2">
           {t.projects.map((p) => (
@@ -604,6 +654,7 @@ function Portfolio() {
         </div>
       </Section>
 
+      {/* SECTION KỸ NĂNG */}
       <Section id="ky-nang" eyebrow={t.sections.skills.eyebrow} title={t.sections.skills.title}>
         <div className="grid gap-6 md:grid-cols-3">
           {t.skills.map((s) => (
@@ -621,6 +672,7 @@ function Portfolio() {
         </div>
       </Section>
 
+      {/* SECTION THÀNH TÍCH */}
       <Section
         id="thanh-tich"
         eyebrow={t.sections.achievements.eyebrow}
@@ -680,6 +732,7 @@ function Portfolio() {
         </Section>
       )}
 
+      {/* SECTION LIÊN HỆ */}
       <Section id="lien-he" eyebrow={t.sections.contact.eyebrow} title={t.sections.contact.title}>
         <div className="flex flex-wrap gap-3">
           {socials.map((s) => (

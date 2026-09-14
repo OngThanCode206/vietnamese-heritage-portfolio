@@ -85,7 +85,7 @@ export const content: Record<Lang, Content> = {
       role: "Sinh viên Công nghệ Thông tin — HUTECH",
       tagline: "AI • IoT / Hệ thống nhúng • Web Developer",
       intro:
-        " Là một sinh viên Công nghệ Thông tin đầy nhiệt huyết, mình tập trung nghiên cứu sự kết hợp giữa Phần cứng, Phần mềm và Trí tuệ Nhân tạo (AI). Luôn chủ động trong R&D và tích cực thử thách bản thân qua các cuộc thi công nghệ, mình hướng tới việc tạo ra những hệ thống tự động hóa thông minh mang lại giá trị thiết thực cho cộng đồng cũng như sự phát triển lâu dài của bản thân.",
+        "Là một sinh viên Công nghệ Thông tin đầy nhiệt huyết, mình tập trung nghiên cứu sự kết hợp giữa Phần cứng, Phần mềm và Trí tuệ Nhân tạo (AI). Luôn chủ động trong R&D và tích cực thử thách bản thân qua các cuộc thi công nghệ, mình hướng tới việc tạo ra những hệ thống tự động hóa thông minh mang lại giá trị thiết thực cho cộng đồng cũng như sự phát triển lâu dài của bản thân.",
       cv: "Xem CV",
       contactBtn: "Liên hệ",
       musicOn: "Đang phát",
@@ -94,7 +94,7 @@ export const content: Record<Lang, Content> = {
       light: "Chế độ sáng",
       dark: "Chế độ tối",
       language: "Ngôn ngữ",
-      avatarCaption: " Sinh viên CNTT · HUTECH ",
+      avatarCaption: "Sinh viên CNTT · HUTECH",
       interestsTitle: "Sở thích cá nhân",
       hoangSa: "Hoàng Sa",
       truongSa: "Trường Sa",
@@ -317,7 +317,7 @@ export const content: Record<Lang, Content> = {
       role: "Information Technology Student — HUTECH",
       tagline: "AI • IoT / Embedded Systems • Java Web Developer",
       intro:
-        "I build across hardware and software: from real-world ESP32 sensors to Java Spring Boot web systems and AI models. Career focus: AI, IoT/Embedded Systems and Java Web Development.",
+        "As a passionate Information Technology student, I focus on researching the convergence of Hardware, Software, and Artificial Intelligence (AI). Constantly proactive in R&D and actively challenging myself through tech competitions, I aim to create intelligent automation systems that deliver practical value to the community and drive long-term personal growth.",
       cv: "View CV",
       contactBtn: "Contact",
       musicOn: "Playing",
@@ -544,7 +544,7 @@ export const content: Record<Lang, Content> = {
       role: "정보기술 전공 학생 — HUTECH",
       tagline: "AI • IoT / 임베디드 시스템 • Java 웹 개발자",
       intro:
-        "하드웨어와 소프트웨어를 함께 다룹니다. 실제 ESP32 센서부터 Java Spring Boot 웹 시스템과 AI 모델까지 구현합니다. 목표 분야: AI, IoT/임베디드 시스템, Java 웹 개발.",
+        "열정적인 정보기술(IT) 전공 학생으로서, 저는 하드웨어, 소프트웨어, 그리고 인공지능(AI)의 융합을 연구하는 데 집중하고 있습니다. R&D에 항상 능동적으로 임하며 다양한 기술 경진대회를 통해 끊임없이 도전하고 있으며, 사회에 실질적인 가치를 제공하고 지속적인 성장을 이룰 수 있는 지능형 자동화 시스템 구축을 목표로 하고 있습니다.",
       cv: "이력서 보기",
       contactBtn: "연락하기",
       musicOn: "재생 중",
