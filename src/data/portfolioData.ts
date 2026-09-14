@@ -30,7 +30,7 @@ type SkillGroup = { group: string; items: string[] };
 type Achievement = { year: string; title: string };
 type Activity = { period: string; title: string; role: string; details: string[] };
 
-type Content = {
+export type Content = {
   nav: { about: string; experience: string; projects: string; skills: string; achievements: string; activities: string; contact: string };
   ui: {
     eyebrow: string;
@@ -56,7 +56,7 @@ type Content = {
     projects: { eyebrow: string; title: string; featuredTitle: string; otherTitle: string };
     skills: { eyebrow: string; title: string };
     achievements: { eyebrow: string; title: string };
-    activities: { eyebrow: string; title: title };
+    activities: { eyebrow: string; title: string };
     contact: { eyebrow: string; title: string };
   };
   interests: string[];
@@ -113,7 +113,7 @@ export const content: Record<Lang, Content> = {
       activities: { eyebrow: "Activities & Contests", title: "Hoạt động & Phong trào" },
       contact: { eyebrow: "Contact", title: "Kết nối với mình" },
     },
-    interests: ["⚽ Bóng đá", "✈️ Đi du lịch", "🍲 Khám phá ẩm thực"],
+    interests: ["⚽ Bóng đá", "✈️ Đi du lịch", "🍲 Ăn uống"],
     experiences: [
       {
         role: "Liên chi Hội Trưởng",
@@ -260,40 +260,43 @@ export const content: Record<Lang, Content> = {
     activities: [
       {
         period: "2024 – 2026",
-        title: "Hoạt động Phong trào & Đoàn - Hội (Viện CNTT Việt - Hàn, HUTECH)",
-        role: "Thành viên Ban Tổ chức & Tích cực tham gia",
+        title: "Viện Công nghệ Việt – Hàn, Đại học HUTECH",
+        role: "Sinh viên tham gia hoạt động học thuật và phong trào sinh viên",
         details: [
-          "Đạt Giải Nhất Bóng đá Viện Công nghệ Việt – Hàn 2025 & Giải Ba Rung Chuông Vàng 'Tìm hiểu ASEAN' 2025.",
-          "Được tuyên dương 'Sinh viên tiêu biểu trong học tập và rèn luyện năm học 2024 – 2025'.",
-          "Thành viên Ban Tổ chức: Lễ hội Văn hóa Việt - Hàn 2025, Chiến dịch Xuân tình nguyện 2026 (Đắc Nông), Chuỗi hoạt động Hành trình khám phá di sản.",
-          "Tham gia các chương trình tiêu biểu: Talkshow 'Sinh viên 5 tốt – Thời cơ và Thách thức', Ngày hội Sinh viên 5 tốt 2025, Trình diễn trang phục truyền thống các quốc gia, Tuyên dương Thanh niên tiên tiến làm theo lời Bác 2025, Triển lãm và Lễ kết nạp Đảng.",
+          "Đạt Giải Ba cuộc thi “Rung Chuông Vàng – Tìm hiểu ASEAN” năm 2025.",
+          "Đạt Giải Nhất Bóng đá Viện Công nghệ Việt – Hàn năm 2025.",
+          "Được tuyên dương danh hiệu “Sinh viên tiêu biểu trong học tập và rèn luyện năm học 2024 – 2025”.",
+          "Tham gia Talkshow “Sinh viên 5 tốt – Thời cơ và Thách thức”.",
+          "Tham gia hoạt động tư tưởng trong khuôn khổ Ngày hội “Sinh viên 5 tốt” năm 2025.",
+          "Tham gia hoạt động hội nhập “Trình diễn trang phục truyền thống các quốc gia”.",
+          "Tham dự Lễ khai mạc, Tuyên dương Thanh niên tiên tiến làm theo lời Bác 2025, Lễ kết nạp Đảng và Triển lãm Ngày hội Sinh viên 5 tốt.",
+          "Thành viên BTC của Lễ hội Văn hóa Việt - Hàn năm 2025 do Viện Công nghệ Việt Hàn phối hợp cùng Học viện King Sejong Hồ Chí Minh 3 tổ chức.",
+          "Thành viên BTC chiến dịch Xuân tình nguyện 2026 do Viện Công nghệ Việt Hàn tổ chức tại Đắc Nông.",
+          "Thành viên BTC của chuỗi hoạt động Hành trình khám phá di sản do Viện Công nghệ Việt Hàn tổ chức.",
         ],
       },
       {
         period: "08/2025 – 11/2025",
-        title: "Cuộc thi Công nghệ AIoT Innoworks 2025",
-        role: "Thí sinh Vòng Bán kết (Đạt giải Khuyến khích)",
+        title: "AIoT Innoworks 2025",
+        role: "Thí sinh tham gia vòng Bán kết",
         details: [
-          "Nghiên cứu và phát triển giải pháp IoT & AI sáng tạo phục vụ bài toán thực tế.",
-          "Rèn luyện kỹ năng thuyết trình dự án, tư duy sáng tạo và làm việc nhóm dưới áp lực cao.",
+          "Tham gia nghiên cứu và phát triển ý tưởng sáng tạo phục vụ cuộc thi công nghệ InnoWorks 2025.",
         ],
       },
       {
         period: "06/2025",
-        title: "Cuộc thi Ý tưởng Sáng tạo trẻ TP. Hồ Chí Minh lần thứ 17 – 2025",
-        role: "Trưởng nhóm tham gia",
+        title: "Cuộc thi Ý tưởng Sáng tạo trẻ TP. Hồ Chí Minh lần thứ 17 – 2025 Chủ đề 'Ý thức thúc đẩy phong trào Bình Dân học vụ số'",
+        role: "Trưởng nhóm tham gia cuộc thi",
         details: [
-          "Đề xuất và phát triển ý tưởng ứng dụng công nghệ với chủ đề 'Ý thức thúc đẩy phong trào Bình Dân học vụ số'.",
-          "Nâng cao khả năng phân tích, giải quyết bài toán thực tế và tư duy thiết kế giải pháp số cho cộng đồng.",
+          "Tham gia đề xuất và phát triển ý tưởng sáng tạo ứng dụng công nghệ vào thực tiễn.",
         ],
       },
       {
         period: "06/2025",
-        title: "Cuộc thi Chính luận Bảo vệ Nền tảng Tư tưởng của Đảng 2025 (HUTECH)",
-        role: "Thí sinh tham gia",
+        title: "Đoàn Trường Đại học Công nghệ TP. Hồ Chí Minh",
+        role: "Thí sinh tham gia cuộc thi Chính Luận",
         details: [
-          "Hoàn thành bài viết tham gia cuộc thi Chính luận lần thứ Nhất năm 2025 do Đoàn Trường HUTECH tổ chức.",
-          "Rèn luyện kỹ năng lập luận, tư duy phản biện, góc nhìn xã hội và trách nhiệm của thanh niên.",
+          "Có bài viết tham gia Cuộc thi Chính luận về bảo vệ nền tảng tư tưởng của Đảng trong đoàn viên, thanh thiếu niên lần thứ Nhất năm 2025.",
         ],
       },
     ],
@@ -342,7 +345,7 @@ export const content: Record<Lang, Content> = {
       activities: { eyebrow: "Activities & Contests", title: "Activities & Competitions" },
       contact: { eyebrow: "Contact", title: "Let's connect" },
     },
-    interests: ["⚽ Football / Soccer", "✈️ Traveling", "🍲 Food & Culinary Exploration"],
+    interests: ["⚽ Football", "✈️ Traveling", "🍲 Eating out"],
     experiences: [
       {
         role: "Head of Student Association Branch",
@@ -489,22 +492,22 @@ export const content: Record<Lang, Content> = {
     activities: [
       {
         period: "2024 – 2026",
-        title: "Youth Union & Student Association Activities (VKIT - HUTECH)",
-        role: "Organizing Committee & Active Member",
+        title: "Viet-Han Institute of Technology, HUTECH University",
+        role: "Active participant in academic activities and student movement",
         details: [
-          "Won 1st Place in VKIT Football Tournament 2025 & 3rd Place in 'Understanding ASEAN' Golden Bell contest 2025.",
+          "Won 3rd Place in 'Understanding ASEAN' Golden Bell Contest 2025.",
+          "Won 1st Place in Viet-Han Institute Football Championship 2025.",
           "Honored as 'Outstanding Student in Academic and Training Performance 2024 – 2025'.",
+          "Participated in Talkshow 'Student of 5 Merits – Opportunities & Challenges'.",
           "Organizing Committee member: Viet-Han Cultural Festival 2025, Spring Volunteer Campaign 2026 (Dak Nong), Heritage Discovery Journey series.",
-          "Active participant in key events: 'Student of 5 Merits' Talkshow, Cultural Fashion Show, Youth Union Commendation Ceremonies, and Party Member Induction Exhibition.",
         ],
       },
       {
         period: "Aug 2025 – Nov 2025",
-        title: "AIoT Innoworks 2025 Tech Competition",
-        role: "Semi-finalist (Consolation Prize)",
+        title: "AIoT Innoworks 2025",
+        role: "Semi-finalist Contestant",
         details: [
-          "Researched and built innovative IoT & AI solutions for real-world problems.",
-          "Honed project presentation, creative thinking, and high-pressure teamwork skills.",
+          "Researched and built innovative IoT & AI solutions for real-world application.",
         ],
       },
       {
@@ -512,17 +515,15 @@ export const content: Record<Lang, Content> = {
         title: "17th HCMC Youth Creative Ideas Contest 2025",
         role: "Team Lead Participant",
         details: [
-          "Developed tech idea focused on 'Raising Awareness for Digital Literacy Movement'.",
-          "Strengthened problem-solving analysis and digital solution design for social impact.",
+          "Developed creative tech project centered on Digital Literacy Awareness.",
         ],
       },
       {
         period: "Jun 2025",
         title: "Political Essay Contest on Protecting Ideological Foundation (HUTECH)",
-        role: "Participant Contestant",
+        role: "Contestant Participant",
         details: [
-          "Submitted essay for the 1st Political Essay Competition organized by HUTECH Youth Union 2025.",
-          "Enhanced argumentation skills, critical thinking, social awareness, and civic duty.",
+          "Submitted political essay for the 1st HUTECH Youth Union Essay Competition 2025.",
         ],
       },
     ],
@@ -571,13 +572,13 @@ export const content: Record<Lang, Content> = {
       activities: { eyebrow: "Activities & Contests", title: "대외 활동 및 경진대회" },
       contact: { eyebrow: "Contact", title: "연락처" },
     },
-    interests: ["⚽ 축구", "✈️ 여행", "🍲 맛집 탐방 및 요리"],
+    interests: ["⚽ 축구", "✈️ 여행", "🍲 맛집 탐방"],
     experiences: [
       {
         role: "학생회 연합회장",
         org: "호치민 기술대학교 - HUTECH (2026 - 현재)",
         details: [
-          "2025 한-베 문화 축제 조직위원회 위원 (한베기술원 및 세종학당 호치민3 공동 주최).",
+          "2025 한-베 문화 축제 조직위원회 위원.",
           "2026 닥농성 봄 자원봉사 캠페인 조직위원회 위원.",
           "문화유산 탐방 여정 활동 시리즈 조직위원회 위원.",
         ],
@@ -588,7 +589,6 @@ export const content: Record<Lang, Content> = {
         details: [
           "학술 연구 프로젝트 개발 지원 및 기술 장비 유지보수·수리.",
           "대학교 및 고등학교 대상 기술 학술 경진대회 개최.",
-          "프로젝트 관리, 시스템 설계, 프로그래밍 및 기술 운영 역량 강화.",
         ],
       },
       {
@@ -597,7 +597,6 @@ export const content: Record<Lang, Content> = {
         details: [
           "드론 및 로보틱스 기술 장비 유지보수, 수리 및 복원.",
           "국제학교(VAS, Royal School) 학생 대상 STEM 기술 실습 지도 및 강의 지원.",
-          "소프트웨어 개발 프로젝트 팀장: 학생 관리 웹 애플리케이션 및 강좌 판매 웹.",
         ],
       },
     ],
@@ -615,7 +614,7 @@ export const content: Record<Lang, Content> = {
         role: "풀스택 개발자",
         period: "2026.04 – 2026.07",
         description:
-          "Java Spring Boot MVC & MySQL 기반 인사 관리 웹 시스템. Spring Security (Admin, Manager, Employee 3단계 RBAC), JPA/Hibernate, Thymeleaf, Bootstrap 적용.",
+          "Java Spring Boot MVC & MySQL 기반 인사 관리 웹 시스템.",
         tags: ["Spring Boot", "Spring Security", "JPA/Hibernate", "MySQL"],
       },
       {
@@ -641,7 +640,7 @@ export const content: Record<Lang, Content> = {
         role: "프로젝트 팀장",
         period: "2024.05",
         description:
-          "공공 행정 환경에서 자동 안내, 위치 유도 및 상호작용을 지원하는 서비스 로봇 설계 및 제어 프로그래밍.",
+          "공공 행정 환경에서 자동 안내, 위치 유도 및 상호작용을 지원하는 서비스 로봇 설계.",
         tags: ["Robotics", "Embedded", "Control Systems"],
       },
       {
@@ -718,22 +717,21 @@ export const content: Record<Lang, Content> = {
     activities: [
       {
         period: "2024 – 2026",
-        title: "학생회 및 대외 활동 (HUTECH 베트남-한국 기술원)",
-        role: "조직위원회 위원 및 적극 참여자",
+        title: "HUTECH 대학교 베트남-한국 기술원",
+        role: "학생 참가자 및 활동가",
         details: [
-          "2025 VKIT 축구 대회 우승 및 '아세안 알기' 골든벨 3등상 수상.",
+          "2025년 '아세안 알기' 골든벨 3등상 수상.",
+          "2025년 한베기술원 축구 대회 우승.",
           "2024–2025 학년도 학업 및 훈련 우수 학생 표창.",
-          "조직위원회 위원: 2025 한-베 문화 축제, 2026 닥농성 봉사활동, 문화유산 탐방 여정.",
-          "주요 행사의 적극 참여: '우수 대학생' 토크쇼, 전통 의상 패션쇼, 청년 선봉 표창식 및 당원 입당 전시회.",
+          "2025년 한-베 문화 축제, 닥농성 봉사활동, 문화유산 탐방 여정 조직위원회 참여.",
         ],
       },
       {
         period: "2025.08 – 2025.11",
-        title: "AIoT Innoworks 2025 경진대회",
-        role: "본선 진출팀 (장려상 수상)",
+        title: "AIoT Innoworks 2025",
+        role: "본선 진출팀 참가자",
         details: [
           "실제 문제를 해결하기 위한 창의적인 IoT 및 AI 솔루션 연구 및 개발.",
-          "프로젝트 발표, 창의적 사고 및 압박 속 팀워크 역량 강화.",
         ],
       },
       {
@@ -742,16 +740,14 @@ export const content: Record<Lang, Content> = {
         role: "참여팀 팀장",
         details: [
           "디지털 대중 교육 운동 추진을 위한 기술 응용 아이디어 기획 및 개발.",
-          "문제 분석 및 사회적 영향력을 고려한 디지털 솔루션 설계 능력 향상.",
         ],
       },
       {
         period: "2025.06",
-        title: "2025 HUTECH 당 사상 기반 보호 정치 논설 대회",
+        title: "HUTECH 청년단 정치 논설 작성 대회",
         role: "참여 참가자",
         details: [
           "2025년 제1회 HUTECH 청년단 주최 정치 논설 작성 대회 참가 완료.",
-          "논리적 논증, 비판적 사고, 사회적 시각 및 청년의 책임감 함양.",
         ],
       },
     ],
