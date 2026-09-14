@@ -103,7 +103,7 @@ function Section({
 }
 
 const cardClass =
-  "rounded-xl border-2 border-primary/25 bg-card p-6 shadow-[6px_6px_0_0_var(--gold)] transition-transform hover:-translate-y-1";
+  "relative overflow-hidden rounded-xl border-2 border-primary/25 bg-card p-6 shadow-[6px_6px_0_0_var(--gold)] transition-transform hover:-translate-y-1";
 
 function Portfolio() {
   const [lang, setLang] = useState<Lang>("vi");
@@ -320,7 +320,7 @@ function Portfolio() {
         eyebrow={t.sections.experience.eyebrow}
         title={t.sections.experience.title}
       >
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 items-start">
           {t.experiences.map((e) => (
             <article key={e.org} className={cardClass}>
               <h3 className="font-display text-lg font-extrabold text-primary">{e.role}</h3>
@@ -340,7 +340,7 @@ function Portfolio() {
 
       {/* SECTION DỰ ÁN */}
       <Section id="du-an" eyebrow={t.sections.projects.eyebrow} title={t.sections.projects.title}>
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 items-start">
           {t.projects.map((p) => (
             <article key={p.title} className={`flex flex-col ${cardClass}`}>
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">{p.role}</p>
@@ -367,7 +367,7 @@ function Portfolio() {
 
       {/* SECTION KỸ NĂNG */}
       <Section id="ky-nang" eyebrow={t.sections.skills.eyebrow} title={t.sections.skills.title}>
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-3 items-start">
           {t.skills.map((s) => (
             <article key={s.group} className={cardClass}>
               <h3 className="font-display text-sm font-extrabold uppercase tracking-[0.15em] text-primary">
@@ -411,7 +411,7 @@ function Portfolio() {
           eyebrow={t.sections.activities?.eyebrow ?? "Phong trào"}
           title={t.sections.activities?.title ?? "Hoạt động & Phong trào"}
         >
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 items-start">
             {t.activities.map((act, index) => (
               <article key={act.title || index} className={cardClass}>
                 <div className="flex items-start justify-between gap-2">
@@ -449,7 +449,7 @@ function Portfolio() {
         eyebrow={(t.sections as any)?.hobbies?.eyebrow ?? "Cá nhân"}
         title={(t.sections as any)?.hobbies?.title ?? "Sở thích cá nhân"}
       >
-        <div className="grid gap-6 sm:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-3 items-start">
           {((t as any).interests ?? (t as any).hobbies ?? [
             "⚽ Bóng đá",
             "✈️ Đi du lịch",
