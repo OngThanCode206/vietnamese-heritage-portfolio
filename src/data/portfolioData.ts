@@ -11,7 +11,7 @@ export const profile = {
   gpa: "3.42 / 4.0",
   avatar: "/avatar.jpg",
   cvUrl:
-    "https://www.topcv.vn/xem-cv/A1ZSB1pQVAECV1cCDQNZVAELVFZWVgFfUA8NBQdf59",
+    "https://drive.google.com/drive/u/0/folders/19Oq0lUJkXJ6SYPe5B0FbemIQGX39BpMN",
   music: "/music.mp3",
 };
 

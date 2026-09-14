@@ -278,7 +278,7 @@ function MusicPlayer() {
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label="Mở trình phát nhạc"
-        className="inline-flex items-center gap-2 rounded-full border-2 border-primary/70 bg-card px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
+        className="inline-flex items-center gap-1.5 rounded-full border-2 border-primary/70 bg-card px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-primary transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <span className="flex h-3 items-end gap-[2px]" aria-hidden>
           {[0, 1, 2].map((i) => (
@@ -289,8 +289,8 @@ function MusicPlayer() {
             />
           ))}
         </span>
-        <Music className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline truncate max-w-[100px]">{currentTrack.title}</span>
+        <Music className="h-3.5 w-3.5 shrink-0" />
+        <span className="hidden md:inline-block max-w-[80px] lg:max-w-[110px] truncate">{currentTrack.title}</span>
       </button>
 
       {isOpen && (
@@ -426,35 +426,37 @@ function Portfolio() {
 
   return (
     <div className="paper-grain min-h-screen bg-background font-sans text-foreground antialiased">
+      {/* HEADER TỐI ƯU KHÔNG BỊ RỚT HÀNG */}
       <header className="sticky top-0 z-30 border-b-2 border-primary/30 bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <a
             href="#gioi-thieu"
-            className="font-display text-sm font-extrabold tracking-[0.25em] text-primary"
+            className="shrink-0 font-display text-sm font-extrabold tracking-[0.2em] text-primary"
           >
             ★ V.L.C.K
           </a>
 
-          {/* Desktop Nav */}
-          <nav className="hidden items-center gap-6 lg:flex">
+          {/* Desktop Nav - Hiển thị gọn từ màn hình XL trở lên */}
+          <nav className="hidden items-center gap-3 xl:flex 2xl:gap-5">
             {nav.map((n) => (
               <a
                 key={n.id}
                 href={`#${n.id}`}
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-accent"
+                className="whitespace-nowrap text-xs font-semibold text-muted-foreground transition-colors hover:text-accent"
               >
                 {n.label}
               </a>
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
-            {/* Choose Language */}
+          {/* Cụm nút công cụ giữ nguyên bên phải */}
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {/* Chọn ngôn ngữ */}
             <div
-              className="flex items-center gap-1 rounded-full border-2 border-primary/70 bg-card px-2 py-1"
+              className="flex items-center gap-0.5 rounded-full border-2 border-primary/70 bg-card px-1.5 py-1"
               aria-label={t.ui.language}
             >
-              <Globe className="h-3.5 w-3.5 text-primary" aria-hidden />
+              <Globe className="ml-0.5 h-3.5 w-3.5 text-primary" aria-hidden />
               {languages.map((l) => (
                 <button
                   key={l.code}
@@ -462,7 +464,7 @@ function Portfolio() {
                   onClick={() => pick(l.code)}
                   aria-label={l.name}
                   aria-pressed={lang === l.code}
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-bold tracking-wide transition-colors ${
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tracking-wide transition-colors ${
                     lang === l.code
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-accent"
@@ -486,22 +488,22 @@ function Portfolio() {
             {/* Music Player */}
             <MusicPlayer />
 
-            {/* Mobile Nav Toggle */}
+            {/* Mobile Nav Toggle - Hiện ở màn hình < XL */}
             <button
               type="button"
               onClick={() => setMobileNavOpen((prev) => !prev)}
               aria-label="Menu chuyển hướng"
               aria-expanded={mobileNavOpen}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary/70 bg-card text-primary lg:hidden"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary/70 bg-card text-primary xl:hidden"
             >
               {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation Dropdown */}
+        {/* Mobile Nav Dropdown */}
         {mobileNavOpen && (
-          <nav className="border-t border-primary/20 bg-card px-6 py-4 lg:hidden">
+          <nav className="border-t border-primary/20 bg-card px-6 py-4 xl:hidden">
             <div className="flex flex-col gap-3">
               {nav.map((n) => (
                 <a
@@ -747,7 +749,6 @@ function Portfolio() {
           ]).map((item: any, idx: number) => {
             const isString = typeof item === "string";
 
-            // Tự động bóc tách Icon và Tiêu đề nếu item là chuỗi dạng "⚽ Bóng đá"
             let icon = isString
               ? item.match(/\p{Extended_Pictographic}/u)?.[0] || "✨"
               : item.icon;
@@ -755,12 +756,10 @@ function Portfolio() {
               ? item.replace(/\p{Extended_Pictographic}/u, "").trim()
               : item.title || item.name;
 
-            // Mô tả nội dung mặc định cho từng sở thích
             const defaultDescriptions: Record<string, string> = {
-              "Bóng đá":
-                "Theo dõi các trận cầu sôi động, giao lưu và rèn luyện thể lực cùng tinh thần đồng đội.",
+              "Bóng đá": "Theo dõi các trận cầu sôi động, giao lưu và rèn luyện thể lực cùng tinh thần đồng đội.",
               "Đi du lịch":
-                "Khám phá những vùng đất mới, trải nghiệm văn hóa ẩm thực và ghi lại khoảnh khắc đẹp.",
+                "Trải nghiệm văn hóa ẩm thực và ghi lại khoảnh khắc đẹp.",
               "Ăn uống":
                 "Thưởng thức ẩm thực đa dạng, khám phá các quán ăn ngon và đặc sản các vùng miền.",
             };
