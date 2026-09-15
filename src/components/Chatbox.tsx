@@ -687,9 +687,6 @@ export function Chatbox() {
               <div>
                 <h3 className="font-display text-sm font-extrabold leading-none tracking-wide flex items-center gap-1.5">
                   <span>Trợ lý ảo CKy</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-gold/20 text-gold border border-gold/40 font-mono">
-                    AI • CKy
-                  </span>
                 </h3>
 
                 <p className="mt-1 flex items-center gap-1 text-[10px] opacity-90 font-medium">
