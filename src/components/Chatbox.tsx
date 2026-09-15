@@ -636,7 +636,7 @@ export function Chatbox() {
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
       {showCloud && !isOpen && (
-        <div className="relative mb-2 flex items-center gap-1.5 rounded-2xl border-2 border-primary/40 bg-card px-3 py-1.5 text-xs font-bold text-primary shadow-[4px_4px_0_0_var(--gold)] animate-bounce">
+        <div className="relative mb-2 flex items-center gap-1.5 rounded-xl border-2 border-gold bg-[#FAF6ED] dark:bg-card px-3.5 py-2 text-xs font-bold text-primary shadow-[4px_4px_0_0_var(--gold)] animate-bounce">
           <Sparkles className="h-3.5 w-3.5 text-gold" />
 
           <span>Trợ lý ảo CKy</span>
@@ -649,12 +649,12 @@ export function Chatbox() {
             }}
             title="Đóng"
             aria-label="Đóng lời nhắc trợ lý ảo"
-            className="ml-1 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
+            className="ml-1 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-gold/20 hover:text-foreground"
           >
             <X className="h-3 w-3" />
           </button>
 
-          <div className="absolute -bottom-2 right-5 h-0 w-0 border-x-8 border-x-transparent border-t-8 border-t-card" />
+          <div className="absolute -bottom-2 right-5 h-0 w-0 border-x-8 border-x-transparent border-t-8 border-t-gold" />
         </div>
       )}
 
@@ -662,11 +662,13 @@ export function Chatbox() {
         <div
           role="dialog"
           aria-label="Trợ lý ảo CKy"
-          className="mb-2 flex h-[520px] w-[calc(100vw-2.5rem)] max-w-[390px] flex-col overflow-hidden rounded-2xl border-2 border-primary/40 bg-card/95 shadow-[8px_8px_0_0_var(--gold)] backdrop-blur-md transition-all animate-in fade-in zoom-in-95 duration-200"
+          className="mb-2 flex h-[530px] w-[calc(100vw-2.5rem)] max-w-[400px] flex-col overflow-hidden rounded-2xl border-2 border-gold bg-[#FAF6ED] dark:bg-card/95 shadow-[8px_8px_0_0_var(--gold)] backdrop-blur-md transition-all animate-in fade-in zoom-in-95 duration-200"
         >
-          <div className="flex items-center justify-between border-b-2 border-primary/20 bg-primary px-4 py-3 text-primary-foreground">
+          {/* Header phong cách Indochine/Cổ điển */}
+          <div className="relative flex items-center justify-between border-b-2 border-gold bg-primary px-4 py-3 text-primary-foreground">
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gold/40" />
             <div className="flex items-center gap-2.5">
-              <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-gold bg-card text-primary">
+              <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-card text-primary shadow-sm">
                 <img
                   src={chatAvatar}
                   alt="Trợ lý ảo CKy"
@@ -676,21 +678,24 @@ export function Chatbox() {
                 <span
                   className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-card ${
                     isLoading
-                      ? "bg-yellow-400 animate-pulse"
-                      : "bg-green-500 animate-pulse"
+                      ? "bg-amber-400 animate-pulse"
+                      : "bg-emerald-500 animate-pulse"
                   }`}
                 />
               </div>
 
               <div>
-                <h3 className="font-display text-sm font-extrabold leading-none tracking-wide">
-                  Trợ lý ảo CKy
+                <h3 className="font-display text-sm font-extrabold leading-none tracking-wide flex items-center gap-1.5">
+                  <span>Trợ lý ảo CKy</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-gold/20 text-gold border border-gold/40 font-mono">
+                    AI • CKy
+                  </span>
                 </h3>
 
-                <p className="mt-1 flex items-center gap-1 text-[10px] opacity-90">
+                <p className="mt-1 flex items-center gap-1 text-[10px] opacity-90 font-medium">
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
-                      isLoading ? "bg-yellow-300" : "bg-green-400"
+                      isLoading ? "bg-amber-300" : "bg-emerald-400"
                     }`}
                   />
                   {isLoading ? "Đang trả lời..." : "Đang hoạt động"}
@@ -702,13 +707,14 @@ export function Chatbox() {
               type="button"
               onClick={() => setIsOpen(false)}
               aria-label="Đóng chat"
-              className="rounded-lg p-1 text-primary-foreground/80 transition-colors hover:bg-card/20 hover:text-primary-foreground"
+              className="rounded-lg p-1.5 text-primary-foreground/80 transition-colors hover:bg-white/10 hover:text-primary-foreground"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          {/* Thân Chatbox mang hoa văn/màu giấy vintage */}
+          <div className="flex-1 space-y-4 overflow-y-auto p-4 bg-[radial-gradient(#d4af37_0.5px,transparent_0.5px)] [background-size:16px_16px] [background-color:rgba(250,246,237,0.7)] dark:[background-color:var(--card)]">
             {messages.map((message) => {
               if (
                 message.sender === "ai" &&
@@ -728,10 +734,10 @@ export function Chatbox() {
                   }`}
                 >
                   <div
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border text-xs font-bold ${
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border text-xs font-bold shadow-sm ${
                       message.sender === "user"
                         ? "border-primary bg-primary text-primary-foreground"
-                        : "border-gold bg-accent text-accent-foreground"
+                        : "border-gold bg-[#FFFDF9] text-accent-foreground"
                     }`}
                   >
                     {message.sender === "user" ? (
@@ -746,10 +752,10 @@ export function Chatbox() {
                   </div>
 
                   <div
-                    className={`group relative max-w-[82%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                    className={`group relative max-w-[82%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed shadow-sm ${
                       message.sender === "user"
-                        ? "rounded-tr-none bg-primary text-primary-foreground shadow-sm"
-                        : "rounded-tl-none border border-primary/20 bg-secondary/90 text-foreground shadow-sm"
+                        ? "rounded-tr-none bg-primary text-primary-foreground border border-primary"
+                        : "rounded-tl-none border border-gold/40 bg-[#FFFDF9] dark:bg-secondary text-foreground"
                     }`}
                   >
                     <div className="prose prose-sm max-w-none text-xs leading-relaxed dark:prose-invert prose-p:my-1">
@@ -759,9 +765,9 @@ export function Chatbox() {
                     </div>
 
                     <span
-                      className={`mt-1 block text-[9px] opacity-60 ${
+                      className={`mt-1 block text-[9px] opacity-60 font-mono ${
                         message.sender === "user"
-                          ? "text-right text-primary-foreground/70"
+                          ? "text-right text-primary-foreground/80"
                           : "text-left text-muted-foreground"
                       }`}
                     >
@@ -774,7 +780,7 @@ export function Chatbox() {
                       message.text && (
                         <span
                           aria-hidden="true"
-                          className="ml-0.5 inline-block h-3 w-[2px] translate-y-[2px] animate-pulse bg-current"
+                          className="ml-0.5 inline-block h-3 w-[2px] translate-y-[2px] animate-pulse bg-gold"
                         />
                       )}
                   </div>
@@ -785,7 +791,7 @@ export function Chatbox() {
             {isLoading &&
               !messages[messages.length - 1]?.text && (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-gold bg-accent">
+                  <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-gold bg-[#FFFDF9]">
                     <img
                       src={chatAvatar}
                       alt="Trợ lý CKy"
@@ -793,14 +799,14 @@ export function Chatbox() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-primary/20 bg-secondary/80 px-4 py-2.5">
+                  <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-gold/40 bg-[#FFFDF9] dark:bg-secondary/80 px-4 py-2.5 shadow-sm">
                     <span className="mr-1 text-[11px] font-medium text-muted-foreground">
                       CKy đang trả lời
                     </span>
 
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.2s]" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:0.4s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gold" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gold [animation-delay:0.2s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gold [animation-delay:0.4s]" />
                   </div>
                 </div>
               )}
@@ -808,15 +814,16 @@ export function Chatbox() {
             <div ref={chatEndRef} />
           </div>
 
+          {/* Khung gợi ý phong cách thẻ tem cổ điển */}
           {messages.length <= 1 && (
-            <div className="flex flex-wrap gap-1.5 px-3 pb-2">
+            <div className="flex flex-wrap gap-1.5 px-3 py-2 bg-[#F3EFEA] dark:bg-muted/30 border-t border-gold/20">
               {INITIAL_SUGGESTIONS.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
                   disabled={isLoading}
                   onClick={() => void handleSend(suggestion)}
-                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-all hover:border-gold hover:text-primary hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-[#FFFDF9] dark:bg-card px-2.5 py-1 text-[11px] font-medium text-foreground transition-all hover:border-gold hover:bg-gold/10 hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Sparkles className="h-2.5 w-2.5 text-gold" />
                   {suggestion}
@@ -825,7 +832,8 @@ export function Chatbox() {
             </div>
           )}
 
-          <div className="border-t-2 border-primary/20 bg-card p-3">
+          {/* Ô nhập liệu truyền thống */}
+          <div className="border-t-2 border-gold/40 bg-[#FAF6ED] dark:bg-card p-3">
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -841,7 +849,7 @@ export function Chatbox() {
                 maxLength={500}
                 autoComplete="off"
                 placeholder="Hỏi trợ lý CKy bất kỳ thông tin nào..."
-                className="flex-1 rounded-xl border border-primary/30 bg-background px-3.5 py-2 text-base sm:text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 rounded-xl border border-gold/50 bg-[#FFFDF9] dark:bg-background px-3.5 py-2 text-base sm:text-xs text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold disabled:cursor-not-allowed disabled:opacity-60 shadow-inner"
                 aria-label="Nội dung câu hỏi"
               />
 
@@ -849,7 +857,7 @@ export function Chatbox() {
                 type="submit"
                 disabled={!input.trim() || isLoading}
                 aria-label="Gửi tin nhắn"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gold bg-primary text-primary-foreground shadow-sm transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Send className="h-4 w-4" />
               </button>
@@ -858,6 +866,7 @@ export function Chatbox() {
         </div>
       )}
 
+      {/* Nút bật Chatbox chính */}
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
@@ -876,7 +885,8 @@ export function Chatbox() {
         )}
       </button>
 
-      <div className="mt-2 flex min-h-[34px] flex-col items-center rounded-lg border border-primary/20 bg-card/90 px-2.5 py-1 text-center font-mono shadow-sm backdrop-blur-sm">
+      {/* Đồng hồ hiển thị thời gian */}
+      <div className="mt-2 flex min-h-[34px] flex-col items-center rounded-lg border border-gold/40 bg-[#FAF6ED] dark:bg-card/90 px-2.5 py-1 text-center font-mono shadow-xs backdrop-blur-sm">
         {currentTime ? (
           <>
             <span className="text-[11px] font-bold leading-none text-foreground">
