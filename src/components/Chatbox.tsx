@@ -800,7 +800,7 @@ export function Chatbox() {
 
                   <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-gold/40 bg-[#FFFDF9] dark:bg-secondary/80 px-4 py-2.5 shadow-sm">
                     <span className="mr-1 text-[11px] font-medium text-muted-foreground">
-                      CKy đang trả lời
+                     Trợ lý CKy đang trả lời
                     </span>
 
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gold" />
