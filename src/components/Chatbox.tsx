@@ -17,6 +17,8 @@ const INITIAL_SUGGESTIONS = [
   "Thành tích & Học vấn của Kỳ?",
   "Kỳ có kinh nghiệm gì về AI & IoT?",
   "Kỳ có sở thích gì ngoài công việc?",
+  "Kỳ có thể làm việc nhóm không?",
+  "Kỳ hiện đang code ngôn ngữ gì?",
 ];
 
 /**
