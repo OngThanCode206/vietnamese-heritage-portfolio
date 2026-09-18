@@ -9,7 +9,7 @@ import chatAvatar from "@/assets/dai_dien_chatbox.png";
 // ==========================================
 
 /** Danh sách mã ngôn ngữ phản hồi được hỗ trợ */
-export type ResponseLanguage = "vi" | "en" | "kr";
+export type ResponseLanguage = "vi" | "en" | "ko";
 
 interface ChatboxProps {
   /** Ngôn ngữ mặc định truyền từ Props ngoài vào */
@@ -69,7 +69,7 @@ const CHATBOX_I18N = {
     contactInfo:
       "For direct support, feel free to contact Ky via Email at **nky57412@gmail.com**!",
   },
-  kr: {
+  ko: {
     assistantName: "CKy AI 어시스턴트",
     statusActive: "온라인",
     statusTyping: "답변 작성 중...",
@@ -131,7 +131,7 @@ function createId(prefix: string): string {
  * Định dạng giờ tin nhắn theo dạng HH:mm theo đúng định dạng ngôn ngữ
  */
 function formatMessageTime(date: Date, lang: ResponseLanguage = "vi"): string {
-  const localeMap = { vi: "vi-VN", en: "en-US", kr: "ko-KR" };
+  const localeMap = { vi: "vi-VN", en: "en-US", ko: "ko-KR" };
   return date.toLocaleTimeString(localeMap[lang] || "vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
@@ -187,7 +187,7 @@ function detectResponseLanguage(text: string, currentUiLang: ResponseLanguage): 
 
   // 1. Kiểm tra chữ Hàn Quốc
   const koreanChars = normalized.match(/[가-힣ㄱ-ㅎㅏ-ㅣ]/g)?.length ?? 0;
-  if (koreanChars >= 2) return "kr";
+  if (koreanChars >= 2) return "ko";
 
   // 2. Kiểm tra dấu Tiếng Việt
   if (/[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i.test(normalized)) {
@@ -245,7 +245,7 @@ LANGUAGE OVERRIDE FOR THIS REQUEST:
 `;
   }
 
-  if (language === "kr") {
+  if (language === "ko") {
     return `
 LANGUAGE OVERRIDE FOR THIS REQUEST:
 - The user's message is in KOREAN.
@@ -431,7 +431,7 @@ function getFriendlyErrorMessage(error: unknown, lang: ResponseLanguage = "vi"):
     return "Dạ em rất tiếc, current AI service is unavailable. Please try again shortly!";
   }
 
-  if (lang === "kr") {
+  if (lang === "ko") {
     if (message.includes("429") || message.includes("quota")) return "⏳ AI 서비스 요청이 많아 잠시 지연되고 있습니다. 잠시 후 다시 시도해 주세요!";
     return "죄송합니다. 현재 AI 시스템에 오류가 발생했습니다. 잠시 후 다시 시도해 주세요!";
   }
@@ -628,7 +628,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
       const languageLabel =
         responseLanguage === "en"
           ? "ENGLISH"
-          : responseLanguage === "kr"
+          : responseLanguage === "ko"
             ? "KOREAN"
             : "VIETNAMESE";
 
@@ -765,17 +765,12 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
                       isLoading ? "bg-amber-300" : "bg-emerald-400"
                     }`}
                   />
-                  <span>{isLoading ? t.statusTyping : t.statusActive}</span>
-                  {currentTime && (
-                    <span className="ml-1 opacity-85 font-mono">
-                      • {formatLiveTime(currentTime)}
-                    </span>
-                  )}
+                  {isLoading ? t.statusTyping : t.statusActive}
                 </p>
               </div>
             </div>
 
-            {/* BỘ CHỌN NGÔN NGỮ ĐỘNG (VI | EN | KR) VÀ NÚT ĐÓNG */}
+            {/* BỘ CHỌN NGÔN NGỮ ĐỘNG (VI | EN | KO) VÀ NÚT ĐÓNG */}
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 rounded-lg border border-gold/40 bg-black/20 p-1 text-[10px] font-bold">
                 <button
@@ -804,15 +799,15 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCurrentLang("kr")}
+                  onClick={() => setCurrentLang("ko")}
                   className={`rounded px-1.5 py-0.5 transition-colors ${
-                    currentLang === "kr"
+                    currentLang === "ko"
                       ? "bg-gold text-primary font-black shadow-xs"
                       : "text-primary-foreground/70 hover:text-primary-foreground"
                   }`}
                   title="한국어"
                 >
-                  KR
+                  KO
                 </button>
               </div>
 
@@ -932,69 +927,96 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
 
           {/* KHUNG CÁC CÂU GỢI Ý NHANH (QUICK SUGGESTIONS) */}
           {messages.length <= 1 && (
-            <div className="flex flex-wrap gap-1.5 px-3 py-2 bg-[#F3EFEA] dark:bg-muted/30 border-t border-gold/30">
-              {t.suggestions.map((sug) => (
+            <div className="flex flex-wrap gap-1.5 px-3 py-2 bg-[#F3EFEA] dark:bg-muted/30 border-t border-gold/20">
+              {t.suggestions.map((suggestion) => (
                 <button
-                  key={sug}
+                  key={suggestion}
                   type="button"
-                  onClick={() => handleSend(sug)}
                   disabled={isLoading}
-                  className="rounded-full border border-gold/40 bg-card px-2.5 py-1 text-[11px] font-medium text-foreground transition-all hover:bg-gold/20 hover:border-gold disabled:opacity-50"
+                  onClick={() => void handleSend(suggestion)}
+                  className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-[#FFFDF9] dark:bg-card px-2.5 py-1 text-[11px] font-medium text-foreground transition-all hover:border-gold hover:bg-gold/10 hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {sug}
+                  <Sparkles className="h-2.5 w-2.5 text-gold" />
+                  {suggestion}
                 </button>
               ))}
             </div>
           )}
 
-          {/* KHUNG NHẬP TIN NHẮN (INPUT FORM) */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="flex items-center gap-2 border-t-2 border-gold bg-card p-3"
-          >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t.placeholder}
-              disabled={isLoading}
-              className="flex-1 rounded-xl border border-gold/40 bg-background px-3 py-2 text-xs font-medium text-foreground outline-none transition-colors focus:border-gold disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              aria-label="Send message"
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-40"
+          {/* Ô NHẬP LIỆU VÀ NÚT GỬI (INPUT FORM) */}
+          <div className="border-t-2 border-gold/40 bg-[#FAF6ED] dark:bg-card p-3">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSend();
+              }}
+              className="flex items-center gap-2"
             >
-              <Send className="h-4 w-4" />
-            </button>
-          </form>
+              <input
+                type="text"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                disabled={isLoading}
+                maxLength={500}
+                autoComplete="off"
+                placeholder={t.placeholder}
+                className="flex-1 rounded-xl border border-gold/50 bg-[#FFFDF9] dark:bg-background px-3.5 py-2 text-base sm:text-xs text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold disabled:cursor-not-allowed disabled:opacity-60 shadow-inner"
+                aria-label="Question input"
+              />
+
+              <button
+                type="submit"
+                disabled={!input.trim() || isLoading}
+                aria-label="Send message"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gold bg-primary text-primary-foreground shadow-sm transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
-      {/* NÚT TỔNG ĐỂ BẤM MỞ / ĐÓNG CHATBOX */}
+      {/* 3. NÚT BẬT / TẮT CHATBOX (FLOATING ACTION BUTTON) */}
       <button
         type="button"
-        onClick={() => {
-          setIsOpen((prev) => !prev);
-          setShowCloud(false);
-        }}
-        aria-label="Toggle chatbox"
-        className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-transform hover:scale-105 active:scale-95"
+        onClick={() => setIsOpen((open) => !open)}
+        className="group relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-all duration-300 hover:scale-105 active:scale-95"
+        aria-label={isOpen ? "Close virtual assistant" : "Open virtual assistant"}
+        aria-expanded={isOpen}
       >
         {isOpen ? (
           <X className="h-6 w-6" />
         ) : (
           <img
             src={chatAvatar}
-            alt={t.assistantName}
-            className="h-full w-full object-cover"
+            alt="Open virtual assistant"
+            className="h-full w-full object-cover transition-transform group-hover:scale-110"
           />
         )}
       </button>
+
+      {/* 4. WIDGET ĐỒNG HỒ THỜI GIAN THỰC (LIVE CLOCK) */}
+      <div className="mt-2 flex min-h-[34px] flex-col items-center rounded-lg border border-gold/40 bg-[#FAF6ED] dark:bg-card/90 px-2.5 py-1 text-center font-mono shadow-xs backdrop-blur-sm">
+        {currentTime ? (
+          <>
+            <span className="text-[11px] font-bold leading-none text-foreground">
+              {formatLiveTime(currentTime)}
+            </span>
+
+            <span className="mt-0.5 text-[10px] leading-none text-muted-foreground">
+              {formatLiveDate(currentTime)}
+            </span>
+          </>
+        ) : (
+          <span
+            aria-hidden="true"
+            className="text-[11px] leading-[22px] opacity-0"
+          >
+            00:00
+          </span>
+        )}
+      </div>
     </div>
   );
 }
