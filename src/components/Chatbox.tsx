@@ -3,15 +3,17 @@ import { X, Send, User, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { SYSTEM_INSTRUCTION } from "../config/aiPrompt";
 import chatAvatar from "@/assets/dai_dien_chatbox.png";
-import type { Lang } from "@/data/portfolioData";
 
 // ==========================================
 // 1. CÁC KIỂU DỮ LIỆU & INTERFACE (TYPES)
 // ==========================================
 
+/** Danh sách mã ngôn ngữ phản hồi được hỗ trợ */
+export type ResponseLanguage = "vi" | "en" | "ko";
+
 interface ChatboxProps {
-  /** Ngôn ngữ mặc định truyền từ Props ngoài vào ("vi" | "en" | "kr") */
-  lang?: Lang;
+  /** Ngôn ngữ mặc định truyền từ Props ngoài vào */
+  lang?: ResponseLanguage;
 }
 
 interface Message {
@@ -26,16 +28,7 @@ interface Message {
 // ==========================================
 
 /** Bộ từ điển đa ngôn ngữ cho toàn bộ giao diện UI của Chatbox */
-const CHATBOX_I18N: Record<Lang, {
-  assistantName: string;
-  statusActive: string;
-  statusTyping: string;
-  loadingText: string;
-  welcome: string;
-  placeholder: string;
-  suggestions: string[];
-  contactInfo: string;
-}> = {
+const CHATBOX_I18N = {
   vi: {
     assistantName: "Trợ lý ảo CKy",
     statusActive: "Đang hoạt động",
@@ -76,7 +69,7 @@ const CHATBOX_I18N: Record<Lang, {
     contactInfo:
       "For direct support, feel free to contact Ky via Email at **nky57412@gmail.com**!",
   },
-  kr: {
+  ko: {
     assistantName: "CKy AI 어시스턴트",
     statusActive: "온라인",
     statusTyping: "답변 작성 중...",
@@ -96,20 +89,26 @@ const CHATBOX_I18N: Record<Lang, {
     contactInfo:
       "직접 문의가 필요하신 경우, 이메일 **nky57412@gmail.com**으로 contact 해주시기 바랍니다!",
   },
-};
+} as const;
 
-/** Danh sách model Gemini dùng để gọi API */
+/** Danh sách model Gemini dùng để gọi API (Ưu tiên model trước, lỗi chuyển model sau) */
 const GEMINI_MODELS = [
   "gemini-3.5-flash-lite",
   "gemini-3.6-flash",
 ] as const;
 
+/** Mã lỗi HTTP cho phép Retry lại request */
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+/** Số lần retry tối đa cho mỗi Model */
 const MAX_RETRIES_PER_MODEL = 1;
+/** Thời gian chờ giữa các lần retry (ms) */
 const RETRY_DELAY_MS = 650;
+/** Thời gian timeout tối đa cho mỗi request (ms) */
 const REQUEST_TIMEOUT_MS = 8000;
+/** Giới hạn số ký tự tối đa của câu trả lời */
 const MAX_ANSWER_CHARS = 5000;
 
+/** Endpoint gốc của Google Gemini API */
 const API_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -117,6 +116,10 @@ const API_BASE_URL =
 // 3. CÁC HÀM BỔ TRỢ (HELPER FUNCTIONS)
 // ==========================================
 
+/**
+ * Tạo ID ngẫu nhiên duy nhất cho tin nhắn
+ * @param prefix Tiền tố định danh (ví dụ: 'user' hoặc 'ai')
+ */
 function createId(prefix: string): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `${prefix}-${crypto.randomUUID()}`;
@@ -124,8 +127,11 @@ function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function formatMessageTime(date: Date, lang: Lang = "vi"): string {
-  const localeMap: Record<Lang, string> = { vi: "vi-VN", en: "en-US", kr: "ko-KR" };
+/**
+ * Định dạng giờ tin nhắn theo dạng HH:mm theo đúng định dạng ngôn ngữ
+ */
+function formatMessageTime(date: Date, lang: ResponseLanguage = "vi"): string {
+  const localeMap = { vi: "vi-VN", en: "en-US", ko: "ko-KR" };
   return date.toLocaleTimeString(localeMap[lang] || "vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
@@ -133,27 +139,62 @@ function formatMessageTime(date: Date, lang: Lang = "vi"): string {
   });
 }
 
+/**
+ * Định dạng giờ cho widget Đồng hồ thời gian thực (VD: 5:27 pm)
+ */
+function formatLiveTime(date: Date): string {
+  return date
+    .toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .toLowerCase();
+}
+
+/**
+ * Định dạng ngày cho widget Đồng hồ thời gian thực (DD/MM/YYYY)
+ */
+function formatLiveDate(date: Date): string {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Hàm tạm dừng thực thi trong một khoảng thời gian
+ * @param ms Số mili-giây cần tạm dừng
+ */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Kiểm tra xem lỗi phát sinh có phải do AbortController ngắt request không
+ */
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-function detectResponseLanguage(text: string, currentUiLang: Lang): Lang {
+/**
+ * Tự động nhận diện ngôn ngữ của câu hỏi nhập vào (Việt / Anh / Hàn)
+ * @param text Đoạn văn bản người dùng nhập
+ * @param currentUiLang Ngôn ngữ hiện tại của UI để fallback
+ */
+function detectResponseLanguage(text: string, currentUiLang: ResponseLanguage): ResponseLanguage {
   const normalized = text.toLowerCase().trim();
 
   // 1. Kiểm tra chữ Hàn Quốc
   const koreanChars = normalized.match(/[가-힣ㄱ-ㅎㅏ-ㅣ]/g)?.length ?? 0;
-  if (koreanChars >= 2) return "kr";
+  if (koreanChars >= 2) return "ko";
 
   // 2. Kiểm tra dấu Tiếng Việt
   if (/[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i.test(normalized)) {
     return "vi";
   }
 
-  // 3. Từ nhận diện Tiếng Việt
+  // 3. Kiểm tra các từ không dấu đặc trưng của Tiếng Việt
   const vietnameseWords = [
     "xin", "chao", "chào", "anh", "chi", "chị", "em", "toi", "tôi",
     "minh", "mình", "ky", "kỳ", "dang", "đang", "lam", "làm",
@@ -163,6 +204,7 @@ function detectResponseLanguage(text: string, currentUiLang: Lang): Lang {
     "duoc", "được", "khong", "không", "co", "có", "nhung", "những",
     "cua", "của", "voi", "với", "the", "thế", "gioi", "giới", "bao",
     "nhieu", "nhiều", "nhat", "nhất", "la", "là", "va", "và", "hay",
+    "gioi", "giỏi", "du an", "dự án",
   ];
 
   const words: string[] = normalized.match(/[a-zA-ZÀ-ỹĐđ]+/g) ?? [];
@@ -173,12 +215,14 @@ function detectResponseLanguage(text: string, currentUiLang: Lang): Lang {
 
   if (viScore >= 1) return "vi";
 
-  // 4. Từ nhận diện Tiếng Anh
+  // 4. Kiểm tra từ vựng Tiếng Anh
   const englishWords = [
     "hello", "hi", "hey", "thanks", "thank", "please", "what", "who",
     "where", "when", "why", "how", "which", "can", "could", "would",
     "tell", "show", "about", "project", "projects", "experience", "skill",
     "skills", "education", "achievement", "achievements", "student", "developer",
+    "work", "working", "study", "studying", "portfolio", "contact", "email",
+    "is", "are", "do", "does", "did", "has", "have", "and", "or", "the",
   ];
 
   const enScore = englishWords.reduce((score, word) => score + (words.includes(word) ? 1 : 0), 0);
@@ -188,7 +232,10 @@ function detectResponseLanguage(text: string, currentUiLang: Lang): Lang {
   return currentUiLang;
 }
 
-function getLanguageInstruction(language: Lang): string {
+/**
+ * Bổ sung chỉ thị ép buộc ngôn ngữ cho Prompt gửi sang Gemini API
+ */
+function getLanguageInstruction(language: ResponseLanguage): string {
   if (language === "en") {
     return `
 LANGUAGE OVERRIDE FOR THIS REQUEST:
@@ -198,7 +245,7 @@ LANGUAGE OVERRIDE FOR THIS REQUEST:
 `;
   }
 
-  if (language === "kr") {
+  if (language === "ko") {
     return `
 LANGUAGE OVERRIDE FOR THIS REQUEST:
 - The user's message is in KOREAN.
@@ -214,6 +261,9 @@ LANGUAGE OVERRIDE FOR THIS REQUEST:
 `;
 }
 
+/**
+ * Trích xuất chuỗi thông báo lỗi chi tiết từ Response của Gemini API
+ */
 function getApiErrorMessage(status: number, body: string): string {
   let detail = "";
   try {
@@ -225,6 +275,9 @@ function getApiErrorMessage(status: number, body: string): string {
   return `Gemini API Error ${status}${detail ? `: ${detail}` : ""}`;
 }
 
+/**
+ * Đọc nội dung text từ Response Body một cách an toàn
+ */
 async function readErrorBody(response: Response): Promise<string> {
   try {
     return await response.text();
@@ -234,21 +287,26 @@ async function readErrorBody(response: Response): Promise<string> {
 }
 
 // ==========================================
-// 4. HÀM GỌI API GEMINI
+// 4. HÀM GỌI API GEMINI (CORE NETWORK LOGIC)
 // ==========================================
 
+/**
+ * Thực hiện gọi API Google Gemini
+ * Có tích hợp: Tự động Retry khi lỗi mạng, tự chuyển Model khi thất bại, Timeout handling
+ */
 async function fetchGeminiText(
   apiKey: string,
   apiContents: Array<{
     role: "user" | "model";
     parts: Array<{ text: string }>;
   }>,
-  responseLanguage: Lang,
+  responseLanguage: ResponseLanguage,
   signal: AbortSignal
 ): Promise<string> {
   let lastStatus = 0;
   let lastBody = "";
 
+  // Thử lần lượt từng Model trong danh sách GEMINI_MODELS
   for (const modelName of GEMINI_MODELS) {
     for (let attempt = 0; attempt < MAX_RETRIES_PER_MODEL + 1; attempt += 1) {
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -318,10 +376,12 @@ async function fetchGeminiText(
         lastStatus = response.status;
         lastBody = await readErrorBody(response);
 
+        // Đóng các lỗi do API Key không hợp lệ hoặc thiếu quyền
         if (response.status === 400 || response.status === 401 || response.status === 403) {
           throw new Error(getApiErrorMessage(response.status, lastBody));
         }
 
+        // Nếu mã lỗi không thuộc loại Retryable thì bỏ qua thử lại
         if (!RETRYABLE_STATUS.has(response.status) || attempt >= MAX_RETRIES_PER_MODEL) {
           break;
         }
@@ -360,15 +420,18 @@ async function fetchGeminiText(
   );
 }
 
-function getFriendlyErrorMessage(error: unknown, lang: Lang = "vi"): string {
+/**
+ * Chuyển các lỗi kỹ thuật thành câu thông báo lỗi thân thiện cho UI người dùng
+ */
+function getFriendlyErrorMessage(error: unknown, lang: ResponseLanguage = "vi"): string {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
 
   if (lang === "en") {
     if (message.includes("429") || message.includes("quota")) return "⏳ Gemini API is temporarily busy. Please try again in a few seconds!";
-    return "I am sorry, the AI service is currently unavailable. Please try again shortly!";
+    return "Dạ em rất tiếc, current AI service is unavailable. Please try again shortly!";
   }
 
-  if (lang === "kr") {
+  if (lang === "ko") {
     if (message.includes("429") || message.includes("quota")) return "⏳ AI 서비스 요청이 많아 잠시 지연되고 있습니다. 잠시 후 다시 시도해 주세요!";
     return "죄송합니다. 현재 AI 시스템에 오류가 발생했습니다. 잠시 후 다시 시도해 주세요!";
   }
@@ -385,12 +448,21 @@ function getFriendlyErrorMessage(error: unknown, lang: Lang = "vi"): string {
 // ==========================================
 
 export function Chatbox({ lang = "vi" }: ChatboxProps) {
-  const [currentLang, setCurrentLang] = useState<Lang>(lang);
+  // --- STATE QUẢN LÝ ---
+  /** Ngôn ngữ hiện tại của Chatbox (cho phép chuyển đổi động) */
+  const [currentLang, setCurrentLang] = useState<ResponseLanguage>(lang);
+  /** Trạng thái Ẩn/Hiện cửa sổ Chatbox */
   const [isOpen, setIsOpen] = useState(false);
+  /** Trạng thái Ẩn/Hiện bóng gợi ý nổi */
   const [showCloud, setShowCloud] = useState(true);
+  /** Văn bản đang nhập ở ô input */
   const [input, setInput] = useState("");
+  /** Trạng thái AI đang xử lý / gửi yêu cầu */
   const [isLoading, setIsLoading] = useState(false);
+  /** Thời gian hiện tại cho đồng hồ thực */
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
+  /** Danh sách tin nhắn cuộc trò chuyện */
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -400,15 +472,23 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
     },
   ]);
 
+  // --- REFS ---
+  /** Ref hỗ trợ cuộn xuống cuối danh sách tin nhắn */
   const chatEndRef = useRef<HTMLDivElement>(null);
+  /** Ref lưu AbortController để hủy request API khi cẩn thiết */
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  /** Lấy bộ từ từ điển tương ứng với ngôn ngữ đang chọn */
   const t = CHATBOX_I18N[currentLang] || CHATBOX_I18N.vi;
 
+  // --- EFFECTS ---
+
+  /** EFFECT 1: Cập nhật currentLang khi prop `lang` thay đổi */
   useEffect(() => {
     setCurrentLang(lang);
   }, [lang]);
 
+  /** EFFECT 2: Cập nhật tin nhắn chào mặc định khi người dùng chuyển ngôn ngữ */
   useEffect(() => {
     setMessages((prev) =>
       prev.map((msg) =>
@@ -419,8 +499,11 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
     );
   }, [currentLang, t.welcome]);
 
+  /** EFFECT 3: Khởi chạy đồng hồ đếm thời gian thực và cập nhật timestamp tin nhắn chào */
   useEffect(() => {
     const now = new Date();
+    setCurrentTime(now);
+
     setMessages((prev) =>
       prev.map((msg) =>
         msg.id === "welcome"
@@ -429,11 +512,17 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
       )
     );
 
+    const timer = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
     return () => {
+      window.clearInterval(timer);
       abortControllerRef.current?.abort();
     };
   }, [currentLang]);
 
+  /** EFFECT 4: Tự động cuộn xuống cuối danh sách khi có tin nhắn mới hoặc thay đổi trạng thái */
   useEffect(() => {
     if (!isOpen) return;
 
@@ -445,6 +534,11 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
     });
   }, [messages, isLoading, isOpen]);
 
+  // --- HANDLERS & CALLBACKS ---
+
+  /**
+   * Cập nhật nội dung tin nhắn dựa theo ID (dùng cho hiệu ứng gõ chữ Typewriter)
+   */
   const updateMessage = useCallback(
     (messageId: string, text: string) => {
       setMessages((prev) =>
@@ -456,6 +550,10 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
     []
   );
 
+  /**
+   * CỐT LÕI: Hàm gửi tin nhắn, chuẩn bị Prompt, gọi API và chạy hiệu ứng chữ chạy
+   * @param textToSend Nội dung tin nhắn (nếu truyền vào từ nút gợi ý)
+   */
   const handleSend = useCallback(
     async (textToSend?: string) => {
       const query = (textToSend ?? input).trim();
@@ -464,6 +562,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
 
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim();
 
+      // Trường hợp chưa cấu hình API KEY
       if (!apiKey) {
         const userMsg: Message = {
           id: createId("user"),
@@ -490,6 +589,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
       }
 
       const now = new Date();
+      // Nhận diện ngôn ngữ từ văn bản người dùng
       const responseLanguage = detectResponseLanguage(query, currentLang);
 
       const userMsg: Message = {
@@ -508,6 +608,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
         timestamp: formatMessageTime(now, currentLang),
       };
 
+      // Trích xuất tối đa 8 tin nhắn gần nhất làm ngữ cảnh hội thoại (Context)
       const recentMessages = messages
         .filter(
           (message) =>
@@ -527,7 +628,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
       const languageLabel =
         responseLanguage === "en"
           ? "ENGLISH"
-          : responseLanguage === "kr"
+          : responseLanguage === "ko"
             ? "KOREAN"
             : "VIETNAMESE";
 
@@ -557,6 +658,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
       abortControllerRef.current = controller;
 
       try {
+        // Gọi API Gemini
         const answerText = await fetchGeminiText(
           apiKey,
           apiContents,
@@ -564,6 +666,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
           controller.signal
         );
 
+        // Hiệu ứng chữ chạy từng đoạn (Typewriter effect)
         let typedText = "";
         const CHARS_PER_TICK = 4;
         const TICK_MS = 16;
@@ -597,9 +700,10 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
     [input, isLoading, messages, updateMessage, currentLang, t.contactInfo]
   );
 
+  // --- RENDER GIAO DIỆN (JSX) ---
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
-      {/* 1. LỜI NHẮC BONG BÓNG */}
+      {/* 1. LỜI NHẮC BONG BÓNG (FLOATING CLOUD HINT) */}
       {showCloud && !isOpen && (
         <div className="relative mb-2 flex items-center gap-1.5 rounded-xl border-2 border-gold bg-[#FAF6ED] dark:bg-card px-3.5 py-2 text-xs font-bold text-primary shadow-[4px_4px_0_0_var(--gold)] animate-bounce">
           <Sparkles className="h-3.5 w-3.5 text-gold" />
@@ -623,7 +727,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
         </div>
       )}
 
-      {/* 2. CỬA SỔ CHATBOX DIALOG */}
+      {/* 2. CỬA SỔ CHATBOX DẠNG DIALOG */}
       {isOpen && (
         <div
           role="dialog"
@@ -666,7 +770,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
               </div>
             </div>
 
-            {/* BỘ CHỌN NGÔN NGỮ ĐỘNG (VI | EN | KR) */}
+            {/* BỘ CHỌN NGÔN NGỮ ĐỘNG (VI | EN | KO) VÀ NÚT ĐÓNG */}
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 rounded-lg border border-gold/40 bg-black/20 p-1 text-[10px] font-bold">
                 <button
@@ -695,15 +799,15 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCurrentLang("kr")}
+                  onClick={() => setCurrentLang("ko")}
                   className={`rounded px-1.5 py-0.5 transition-colors ${
-                    currentLang === "kr"
+                    currentLang === "ko"
                       ? "bg-gold text-primary font-black shadow-xs"
                       : "text-primary-foreground/70 hover:text-primary-foreground"
                   }`}
                   title="한국어"
                 >
-                  KR
+                  KO
                 </button>
               </div>
 
@@ -718,7 +822,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
             </div>
           </div>
 
-          {/* KHU VỰC HIỂN THỊ DANH SÁCH TIN NHẮN */}
+          {/* KHU VỰC THÂN CHATBOX (HIỂN THỊ DANH SÁCH TIN NHẮN) */}
           <div className="flex-1 space-y-4 overflow-y-auto p-4 bg-[radial-gradient(#d4af37_0.5px,transparent_0.5px)] [background-size:16px_16px] [background-color:rgba(250,246,237,0.7)] dark:[background-color:var(--card)]">
             {messages.map((message) => {
               if (
@@ -779,6 +883,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
                       {message.timestamp}
                     </span>
 
+                    {/* Con trỏ nhấp nháy cho tin nhắn AI đang chạy chữ */}
                     {isLoading &&
                       message.id === messages[messages.length - 1]?.id &&
                       message.sender === "ai" &&
@@ -793,7 +898,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
               );
             })}
 
-            {/* HIỂN THỊ LOADING BA DẤU CHẤM */}
+            {/* BẢNG HIỂN THỊ LOADING (DẠNG 3 DẤU CHẤM) KHI AI ĐANG NGHĨ */}
             {isLoading &&
               !messages[messages.length - 1]?.text && (
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -822,69 +927,96 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
 
           {/* KHUNG CÁC CÂU GỢI Ý NHANH (QUICK SUGGESTIONS) */}
           {messages.length <= 1 && (
-            <div className="flex flex-wrap gap-1.5 px-3 py-2 bg-[#F3EFEA] dark:bg-muted/30 border-t border-gold/30">
-              {t.suggestions.map((sug) => (
+            <div className="flex flex-wrap gap-1.5 px-3 py-2 bg-[#F3EFEA] dark:bg-muted/30 border-t border-gold/20">
+              {t.suggestions.map((suggestion) => (
                 <button
-                  key={sug}
+                  key={suggestion}
                   type="button"
-                  onClick={() => handleSend(sug)}
                   disabled={isLoading}
-                  className="rounded-full border border-gold/40 bg-card px-2.5 py-1 text-[11px] font-medium text-foreground transition-all hover:bg-gold/20 hover:border-gold disabled:opacity-50"
+                  onClick={() => void handleSend(suggestion)}
+                  className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-[#FFFDF9] dark:bg-card px-2.5 py-1 text-[11px] font-medium text-foreground transition-all hover:border-gold hover:bg-gold/10 hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {sug}
+                  <Sparkles className="h-2.5 w-2.5 text-gold" />
+                  {suggestion}
                 </button>
               ))}
             </div>
           )}
 
-          {/* KHUNG NHẬP TIN NHẮN (INPUT FORM) */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="flex items-center gap-2 border-t-2 border-gold bg-card p-3"
-          >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={t.placeholder}
-              disabled={isLoading}
-              className="flex-1 rounded-xl border border-gold/40 bg-background px-3 py-2 text-xs font-medium text-foreground outline-none transition-colors focus:border-gold disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              aria-label="Send message"
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-40"
+          {/* Ô NHẬP LIỆU VÀ NÚT GỬI (INPUT FORM) */}
+          <div className="border-t-2 border-gold/40 bg-[#FAF6ED] dark:bg-card p-3">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSend();
+              }}
+              className="flex items-center gap-2"
             >
-              <Send className="h-4 w-4" />
-            </button>
-          </form>
+              <input
+                type="text"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                disabled={isLoading}
+                maxLength={500}
+                autoComplete="off"
+                placeholder={t.placeholder}
+                className="flex-1 rounded-xl border border-gold/50 bg-[#FFFDF9] dark:bg-background px-3.5 py-2 text-base sm:text-xs text-foreground placeholder:text-muted-foreground focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold disabled:cursor-not-allowed disabled:opacity-60 shadow-inner"
+                aria-label="Question input"
+              />
+
+              <button
+                type="submit"
+                disabled={!input.trim() || isLoading}
+                aria-label="Send message"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gold bg-primary text-primary-foreground shadow-sm transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
-      {/* NÚT TỔNG ĐỂ BẤM MỞ / ĐÓNG CHATBOX */}
+      {/* 3. NÚT BẬT / TẮT CHATBOX (FLOATING ACTION BUTTON) */}
       <button
         type="button"
-        onClick={() => {
-          setIsOpen((prev) => !prev);
-          setShowCloud(false);
-        }}
-        aria-label="Toggle chatbox"
-        className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-transform hover:scale-105 active:scale-95"
+        onClick={() => setIsOpen((open) => !open)}
+        className="group relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-primary text-primary-foreground shadow-[4px_4px_0_0_var(--gold)] transition-all duration-300 hover:scale-105 active:scale-95"
+        aria-label={isOpen ? "Close virtual assistant" : "Open virtual assistant"}
+        aria-expanded={isOpen}
       >
         {isOpen ? (
           <X className="h-6 w-6" />
         ) : (
           <img
             src={chatAvatar}
-            alt={t.assistantName}
-            className="h-full w-full object-cover"
+            alt="Open virtual assistant"
+            className="h-full w-full object-cover transition-transform group-hover:scale-110"
           />
         )}
       </button>
+
+      {/* 4. WIDGET ĐỒNG HỒ THỜI GIAN THỰC (LIVE CLOCK) */}
+      <div className="mt-2 flex min-h-[34px] flex-col items-center rounded-lg border border-gold/40 bg-[#FAF6ED] dark:bg-card/90 px-2.5 py-1 text-center font-mono shadow-xs backdrop-blur-sm">
+        {currentTime ? (
+          <>
+            <span className="text-[11px] font-bold leading-none text-foreground">
+              {formatLiveTime(currentTime)}
+            </span>
+
+            <span className="mt-0.5 text-[10px] leading-none text-muted-foreground">
+              {formatLiveDate(currentTime)}
+            </span>
+          </>
+        ) : (
+          <span
+            aria-hidden="true"
+            className="text-[11px] leading-[22px] opacity-0"
+          >
+            00:00
+          </span>
+        )}
+      </div>
     </div>
   );
 }
