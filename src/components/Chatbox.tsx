@@ -99,26 +99,26 @@ const CHATBOX_I18N = {
 const GEMINI_FAST_MODEL = "gemini-3.5-flash-lite" as const;
 const GEMINI_ACCURATE_MODEL = "gemini-3.5-flash" as const;
 const GEMINI_FALLBACK_MODELS = [
-  "gemini-3.6-flash",
   "gemini-3.1-flash-lite",
+  "gemini-3.6-flash",
 ] as const;
 
 /** Mã lỗi có thể chuyển model ngay để giảm thời gian chờ */
 const FAILOVER_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 /** Retry 429 chỉ một lần và delay rất ngắn */
-const RETRY_DELAY_MS = 300;
-/** Timeout cho một model */
-const REQUEST_TIMEOUT_MS = 5000;
-/** Deadline tổng của một lượt hỏi; tránh fallback kéo dài nhiều chục giây */
-const TOTAL_DEADLINE_MS = 9500;
+const RETRY_DELAY_MS = 250;
+/** Timeout cho một model: đủ rộng cho mạng quốc tế nhưng vẫn nhanh với chatbot */
+const REQUEST_TIMEOUT_MS = 6500;
+/** Deadline tổng của một lượt hỏi; không để chuỗi fallback kéo dài */
+const TOTAL_DEADLINE_MS = 10000;
 /** Giới hạn câu trả lời ở mức đủ dùng cho portfolio FAQ */
-const MAX_ANSWER_CHARS = 2200;
-/** Giới hạn context gửi lại để giảm input token và giảm nhiễu */
+const MAX_ANSWER_CHARS = 1800;
+/** Giới hạn context để giảm input token và tránh mang lỗi cũ vào lượt mới */
 const MAX_HISTORY_MESSAGES = 4;
-const MAX_HISTORY_CHARS = 700;
-/** Chỉ typewriter với câu ngắn để không biến hiệu ứng thành độ trễ */
-const MAX_TYPEWRITER_CHARS = 1000;
-const TYPEWRITER_CHARS_PER_TICK = 10;
+const MAX_HISTORY_CHARS = 500;
+/** Chỉ typewriter với câu ngắn để hiệu ứng không tạo thêm độ trễ đáng kể */
+const MAX_TYPEWRITER_CHARS = 700;
+const TYPEWRITER_CHARS_PER_TICK = 14;
 const TYPEWRITER_TICK_MS = 8;
 
 /** Endpoint gốc của Google Gemini API */
@@ -301,6 +301,19 @@ async function readErrorBody(response: Response): Promise<string> {
   }
 }
 
+function isTechnicalAssistantMessage(text: string): boolean {
+  const value = text.toLowerCase();
+  return (
+    value.includes("gemini api") ||
+    value.includes("hệ thống ai chưa thể") ||
+    value.includes("dịch vụ gemini") ||
+    value.includes("the ai service could not") ||
+    value.includes("gemini api key") ||
+    value.includes("현재 ai 서비스") ||
+    value.includes("gemini가 요청")
+  );
+}
+
 // ==========================================
 // 4. HÀM GỌI API GEMINI (CORE NETWORK LOGIC)
 // ==========================================
@@ -323,143 +336,126 @@ async function fetchGeminiText(
   let lastStatus = 0;
   let lastBody = "";
 
-  // Với FAQ ngắn, Flash-Lite là model chính. Với câu hỏi phức tạp,
-  // dùng Flash trước để tăng độ chính xác mà vẫn giữ minimal thinking.
+  // FAQ ngắn -> Flash-Lite. Câu hỏi kỹ thuật/giải thích -> Flash.
+  // Các model fallback vẫn là model Stable hiện tại của Gemini 3.
   const models = useAccurateModel
-    ? [GEMINI_ACCURATE_MODEL, ...GEMINI_FALLBACK_MODELS]
-    : [GEMINI_FAST_MODEL, GEMINI_ACCURATE_MODEL, ...GEMINI_FALLBACK_MODELS];
+    ? [GEMINI_ACCURATE_MODEL, "gemini-3.6-flash", GEMINI_FAST_MODEL, "gemini-3.1-flash-lite"]
+    : [GEMINI_FAST_MODEL, "gemini-3.1-flash-lite", "gemini-3.6-flash", GEMINI_ACCURATE_MODEL];
 
   for (const modelName of models) {
+    if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+
     let retried429 = false;
+    const elapsed = performance.now() - startedAt;
+    const remaining = TOTAL_DEADLINE_MS - elapsed;
+    if (remaining <= 0) break;
 
-    while (true) {
-      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+    const controller = new AbortController();
+    const forwardAbort = () => controller.abort();
+    signal.addEventListener("abort", forwardAbort, { once: true });
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      Math.min(REQUEST_TIMEOUT_MS, Math.max(400, remaining))
+    );
 
-      const elapsed = performance.now() - startedAt;
-      const remaining = TOTAL_DEADLINE_MS - elapsed;
-      if (remaining <= 0) {
-        throw new Error("Gemini request deadline exceeded.");
-      }
+    try {
+      const thinkingLevel = useAccurateModel ? "low" : "minimal";
+      const maxOutputTokens = useAccurateModel ? 520 : 340;
 
-      const controller = new AbortController();
-      const forwardAbort = () => controller.abort();
-      signal.addEventListener("abort", forwardAbort, { once: true });
-      const timeoutId = window.setTimeout(
-        () => controller.abort(),
-        Math.min(REQUEST_TIMEOUT_MS, Math.max(250, remaining))
+      const response = await fetch(
+        `${API_BASE_URL}/${modelName}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [
+                {
+                  text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp.\n- Trả lời trực tiếp, đủ ý, không lan man.\n- Câu hỏi thông thường: tối đa 3 ý chính.\n- Chỉ mở rộng khi người dùng yêu cầu chi tiết.\n- Không bịa, không suy đoán dữ kiện cá nhân, thời gian, chức danh hoặc thành tích.\n- Nếu portfolio không có thông tin, nói rõ thông tin đó chưa được cung cấp.\n- Giữ nguyên tên dự án, công nghệ và mốc thời gian.\n- Không lặp lại câu hỏi.\n\nFINAL OUTPUT LANGUAGE RULE (HIGHEST PRIORITY):\n${getLanguageInstruction(responseLanguage)}`,
+                },
+              ],
+            },
+            contents: apiContents,
+            generationConfig: {
+              thinkingConfig: {
+                thinkingLevel,
+              },
+              maxOutputTokens,
+            },
+          }),
+          signal: controller.signal,
+        }
       );
 
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/${modelName}:generateContent`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey,
-            },
-            body: JSON.stringify({
-              // Giữ phần system prompt ổn định để tăng cơ hội implicit cache hit.
-              // Chỉ thị ngôn ngữ được đặt ở cuối system prompt để thắng các rule cũ trong aiPrompt.
-              systemInstruction: {
-                parts: [
-                  {
-                    text: `${SYSTEM_INSTRUCTION}
+      if (response.ok) {
+        const data = await response.json();
+        const parts = data?.candidates?.[0]?.content?.parts;
+        const finishReason = data?.candidates?.[0]?.finishReason;
 
-QUY TẮC CHATBOX PORTFOLIO:
-- Chỉ trả lời dựa trên thông tin portfolio được cung cấp.
-- Ưu tiên câu trả lời ngắn, trực tiếp và đúng trọng tâm.
-- Mặc định tối đa 3 ý chính; chỉ mở rộng khi người dùng yêu cầu chi tiết hoặc liệt kê đầy đủ.
-- Không bịa, không suy đoán dữ kiện cá nhân, thời gian, chức danh hoặc thành tích.
-- Nếu portfolio không có thông tin, nói rõ rằng thông tin đó chưa được cung cấp.
-- Giữ nguyên tên dự án, công nghệ và mốc thời gian chính xác như portfolio.
-- Không lặp lại câu hỏi của người dùng.
+        const text = Array.isArray(parts)
+          ? parts
+              .map((part: { text?: unknown }) =>
+                typeof part?.text === "string" ? part.text : ""
+              )
+              .join("")
+              .trim()
+          : "";
 
-FINAL OUTPUT LANGUAGE RULE (HIGHEST PRIORITY FOR THIS REQUEST):
-${getLanguageInstruction(responseLanguage)}`,
-                  },
-                ],
-              },
-              contents: apiContents,
-              generationConfig: {
-                thinkingConfig: {
-                  thinkingLevel: "minimal",
-                },
-                maxOutputTokens: useAccurateModel ? 600 : 420,
-              },
-            }),
-            signal: controller.signal,
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          const parts = data?.candidates?.[0]?.content?.parts;
-          const finishReason = data?.candidates?.[0]?.finishReason;
-
-          const text = Array.isArray(parts)
-            ? parts
-                .map((part: { text?: unknown }) =>
-                  typeof part?.text === "string" ? part.text : ""
-                )
-                .join("")
-                .trim()
-            : "";
-
-          if (text) {
-            return text.slice(0, MAX_ANSWER_CHARS);
-          }
-
-          if (finishReason === "MAX_TOKENS") {
-            throw new Error("Gemini output token limit reached.");
-          }
-
-          throw new Error("Gemini returned response without text content.");
+        if (text) {
+          const elapsedMs = Math.round(performance.now() - startedAt);
+          console.debug(`[CKy] ${modelName} responded in ${elapsedMs}ms`);
+          return text.slice(0, MAX_ANSWER_CHARS);
         }
 
+        if (finishReason === "MAX_TOKENS") {
+          lastStatus = 200;
+          lastBody = "Gemini output token limit reached.";
+        } else {
+          lastStatus = 200;
+          lastBody = "Gemini returned response without text content.";
+        }
+      } else {
         lastStatus = response.status;
         lastBody = await readErrorBody(response);
 
+        // 400/401/403 là lỗi request/key/quyền: không đổi model mù quáng.
         if (response.status === 400 || response.status === 401 || response.status === 403) {
           throw new Error(getApiErrorMessage(response.status, lastBody));
         }
 
-        // 429: retry đúng 1 lần nếu vẫn còn đủ thời gian.
+        // 429: retry một lần cực ngắn nếu deadline còn đủ.
         if (response.status === 429 && !retried429) {
           const remainingAfter429 = TOTAL_DEADLINE_MS - (performance.now() - startedAt);
-          if (remainingAfter429 > RETRY_DELAY_MS + 700) {
+          if (remainingAfter429 > RETRY_DELAY_MS + 500) {
             retried429 = true;
             await sleep(RETRY_DELAY_MS);
             continue;
           }
         }
 
-        // 5xx/timeout: chuyển model ngay, không lặp nhiều lần trên cùng model.
+        // 5xx/408: bỏ model hiện tại và chuyển model tiếp theo ngay.
         if (FAILOVER_STATUS.has(response.status)) {
           break;
         }
-
-        break;
-      } catch (error) {
-        if (isAbortError(error)) {
-          if (signal.aborted) throw error;
-          lastStatus = 504;
-          lastBody = "Request timeout";
-          break;
-        }
-
-        if (error instanceof Error && error.message.startsWith("Gemini API Error")) {
-          throw error;
-        }
-
-        lastBody = error instanceof Error ? error.message : String(error);
-        break;
-      } finally {
-        window.clearTimeout(timeoutId);
-        signal.removeEventListener("abort", forwardAbort);
       }
-
-      break;
+    } catch (error) {
+      if (isAbortError(error)) {
+        if (signal.aborted) throw error;
+        lastStatus = 504;
+        lastBody = "Request timeout";
+      } else if (error instanceof Error && error.message.startsWith("Gemini API Error")) {
+        throw error;
+      } else {
+        lastStatus = 0;
+        lastBody = error instanceof Error ? error.message : String(error);
+      }
+    } finally {
+      window.clearTimeout(timeoutId);
+      signal.removeEventListener("abort", forwardAbort);
     }
   }
 
@@ -698,7 +694,12 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
 
       // Chỉ gửi vài lượt gần nhất và cắt mỗi lượt để giảm input token + nhiễu.
       const recentMessages = messages
-        .filter((message) => message.id !== "welcome" && message.text.trim() !== "")
+        .filter(
+          (message) =>
+            message.id !== "welcome" &&
+            message.text.trim() !== "" &&
+            !isTechnicalAssistantMessage(message.text)
+        )
         .slice(-MAX_HISTORY_MESSAGES);
 
       const historyContents = recentMessages.map((message) => ({
@@ -719,9 +720,9 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
       // câu hỏi nhiều ý/giải thích kỹ → Flash để tăng độ chính xác.
       const lowerQuery = query.toLowerCase();
       const useAccurateModel =
-        query.length > 140 ||
+        query.length > 120 ||
         (query.match(/[?？！]/g)?.length ?? 0) >= 2 ||
-        /\b(why|how|explain|compare|difference|detail|detailed|architecture|technical|vì sao|tại sao|như thế nào|giải thích|so sánh|chi tiết|kiến trúc|kỹ thuật|왜|어떻게|설명|비교|자세히|기술)\b/i.test(lowerQuery);
+        /\b(why|how|explain|compare|difference|detail|detailed|architecture|technical|technology|vì sao|tại sao|như thế nào|giải thích|so sánh|chi tiết|kiến trúc|kỹ thuật|công nghệ|왜|어떻게|설명|비교|자세히|기술)\b/i.test(lowerQuery);
 
       const apiContents = [
         ...historyContents,
@@ -782,6 +783,7 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
           return;
         }
 
+        console.error("[CKy Gemini] Request failed", error);
         const friendlyMessage = getFriendlyErrorMessage(error, currentLang);
 
         updateMessage(
