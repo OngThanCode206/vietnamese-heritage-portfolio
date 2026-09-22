@@ -96,12 +96,11 @@ const CHATBOX_I18N = {
  * Ưu tiên model Flash-Lite có độ trễ thấp, sau đó mới chuyển sang model dự phòng.
  * Lưu ý: Gemini 3.8/3.7 không cần thiết cho chatbot FAQ và có thể chịu tải cao hơn.
  */
-const GEMINI_FAST_MODEL = "gemini-3.8-flash" as const;
-const GEMINI_ACCURATE_MODEL = "gemini-3.8-flash" as const;
+const GEMINI_FAST_MODEL = "gemini-3.6-flash" as const;
+const GEMINI_ACCURATE_MODEL = "gemini-3.6-flash" as const;
 const GEMINI_FALLBACK_MODELS = [
-  "gemini-3.7-flash",
-  "gemini-3.6-flash",
-  "gemini-2.5-flash",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
 ] as const;
 
 /** Mã lỗi có thể chuyển model ngay để giảm thời gian chờ */
@@ -340,8 +339,8 @@ async function fetchGeminiText(
   // FAQ ngắn -> Flash-Lite. Câu hỏi kỹ thuật/giải thích -> Flash.
   // Các model fallback vẫn là model Stable hiện tại của Gemini 3.
   const models = useAccurateModel
-    ? [GEMINI_ACCURATE_MODEL, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"]
-    : [GEMINI_FAST_MODEL, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"];
+    ? [GEMINI_ACCURATE_MODEL, "gemini-3.6-flash", GEMINI_FAST_MODEL, "gemini-3.1-flash-lite"]
+    : [GEMINI_FAST_MODEL, "gemini-3.1-flash-lite", "gemini-3.6-flash", GEMINI_ACCURATE_MODEL];
 
   for (const modelName of models) {
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
