@@ -96,21 +96,30 @@ const CHATBOX_I18N = {
  * Ưu tiên model Flash-Lite có độ trễ thấp, sau đó mới chuyển sang model dự phòng.
  * Lưu ý: Gemini 3.8/3.7 không cần thiết cho chatbot FAQ và có thể chịu tải cao hơn.
  */
-const GEMINI_MODELS = [
-  "gemini-3.5-flash-lite",
+const GEMINI_FAST_MODEL = "gemini-3.5-flash-lite" as const;
+const GEMINI_ACCURATE_MODEL = "gemini-3.5-flash" as const;
+const GEMINI_FALLBACK_MODELS = [
   "gemini-3.6-flash",
-  "gemini-3.5-flash",
   "gemini-3.1-flash-lite",
 ] as const;
 
-/** Mã lỗi HTTP có thể chuyển sang model khác ngay */
+/** Mã lỗi có thể chuyển model ngay để giảm thời gian chờ */
 const FAILOVER_STATUS = new Set([408, 429, 500, 502, 503, 504]);
-/** Thời gian chờ retry ngắn cho 429 */
-const RETRY_DELAY_MS = 550;
-/** Thời gian timeout tối đa cho mỗi request (ms) */
-const REQUEST_TIMEOUT_MS = 8000;
-/** Giới hạn số ký tự tối đa của câu trả lời */
-const MAX_ANSWER_CHARS = 5000;
+/** Retry 429 chỉ một lần và delay rất ngắn */
+const RETRY_DELAY_MS = 300;
+/** Timeout cho một model */
+const REQUEST_TIMEOUT_MS = 5000;
+/** Deadline tổng của một lượt hỏi; tránh fallback kéo dài nhiều chục giây */
+const TOTAL_DEADLINE_MS = 9500;
+/** Giới hạn câu trả lời ở mức đủ dùng cho portfolio FAQ */
+const MAX_ANSWER_CHARS = 2200;
+/** Giới hạn context gửi lại để giảm input token và giảm nhiễu */
+const MAX_HISTORY_MESSAGES = 4;
+const MAX_HISTORY_CHARS = 700;
+/** Chỉ typewriter với câu ngắn để không biến hiệu ứng thành độ trễ */
+const MAX_TYPEWRITER_CHARS = 1000;
+const TYPEWRITER_CHARS_PER_TICK = 10;
+const TYPEWRITER_TICK_MS = 8;
 
 /** Endpoint gốc của Google Gemini API */
 const API_BASE_URL =
@@ -189,17 +198,17 @@ function isAbortError(error: unknown): boolean {
 function detectResponseLanguage(text: string, currentUiLang: ResponseLanguage): ResponseLanguage {
   const normalized = text.toLowerCase().trim();
 
-  // 1. Kiểm tra chữ Hàn Quốc
+  // 1. Chữ Hàn là tín hiệu mạnh và gần như không mơ hồ.
   const koreanChars = normalized.match(/[가-힣ㄱ-ㅎㅏ-ㅣ]/g)?.length ?? 0;
   if (koreanChars >= 2) return "ko";
 
-  // 2. Kiểm tra dấu Tiếng Việt
+  // 2. Dấu tiếng Việt là tín hiệu mạnh nhất cho tiếng Việt.
   if (/[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i.test(normalized)) {
     return "vi";
   }
 
-  // 3. Kiểm tra các từ không dấu đặc trưng của Tiếng Việt
-  const vietnameseWords = [
+  const words = normalized.match(/[a-zA-ZÀ-ỹĐđ]+/g) ?? [];
+  const vietnameseWords = new Set([
     "xin", "chao", "chào", "anh", "chi", "chị", "em", "toi", "tôi",
     "minh", "mình", "ky", "kỳ", "dang", "đang", "lam", "làm",
     "gi", "gì", "nao", "nào", "du", "dự", "an", "án", "hoc", "học",
@@ -208,30 +217,32 @@ function detectResponseLanguage(text: string, currentUiLang: ResponseLanguage): 
     "duoc", "được", "khong", "không", "co", "có", "nhung", "những",
     "cua", "của", "voi", "với", "the", "thế", "gioi", "giới", "bao",
     "nhieu", "nhiều", "nhat", "nhất", "la", "là", "va", "và", "hay",
-    "gioi", "giỏi", "du an", "dự án",
-  ];
+    "gioi", "giỏi", "duan", "dự án",
+  ]);
 
-  const words: string[] = normalized.match(/[a-zA-ZÀ-ỹĐđ]+/g) ?? [];
-  const viScore = vietnameseWords.reduce(
-    (score, word) => score + (words.includes(word) ? 1 : 0),
-    0
-  );
-
-  if (viScore >= 1) return "vi";
-
-  // 4. Kiểm tra từ vựng Tiếng Anh
-  const englishWords = [
+  const englishWords = new Set([
     "hello", "hi", "hey", "thanks", "thank", "please", "what", "who",
     "where", "when", "why", "how", "which", "can", "could", "would",
     "tell", "show", "about", "project", "projects", "experience", "skill",
     "skills", "education", "achievement", "achievements", "student", "developer",
     "work", "working", "study", "studying", "portfolio", "contact", "email",
     "is", "are", "do", "does", "did", "has", "have", "and", "or", "the",
-  ];
+    "my", "your", "his", "her", "their", "this", "that", "with", "from",
+  ]);
 
-  const enScore = englishWords.reduce((score, word) => score + (words.includes(word) ? 1 : 0), 0);
+  const viScore = words.reduce<number>((score, word) => score + (vietnameseWords.has(word) ? 1 : 0), 0);
+  const enScore = words.reduce<number>((score, word) => score + (englishWords.has(word) ? 1 : 0), 0);
 
+  // Câu tiếng Việt không dấu vẫn được ưu tiên nếu có từ đặc trưng.
+  if (viScore >= 1 && viScore >= enScore) return "vi";
   if (enScore >= 1) return "en";
+
+  // Nếu toàn bộ ký tự Latin và không có dấu tiếng Việt, dùng UI language.
+  // Điều này giữ hành vi ổn định với các câu cực ngắn/đặc biệt.
+  if (words.length > 0 && words.length >= 2) {
+    const latinOnly = words.join(" ").replace(/[^a-zA-Z\s]/g, "").trim();
+    if (latinOnly && currentUiLang === "en") return "en";
+  }
 
   return currentUiLang;
 }
@@ -305,25 +316,37 @@ async function fetchGeminiText(
     parts: Array<{ text: string }>;
   }>,
   responseLanguage: ResponseLanguage,
-  signal: AbortSignal
+  signal: AbortSignal,
+  useAccurateModel: boolean
 ): Promise<string> {
+  const startedAt = performance.now();
   let lastStatus = 0;
   let lastBody = "";
 
-  // Thử lần lượt từng model. Các lỗi 5xx/timeout sẽ chuyển model ngay.
-  // Chỉ 429 được retry 1 lần vì đây thường là rate limit tạm thời.
-  for (const modelName of GEMINI_MODELS) {
+  // Với FAQ ngắn, Flash-Lite là model chính. Với câu hỏi phức tạp,
+  // dùng Flash trước để tăng độ chính xác mà vẫn giữ minimal thinking.
+  const models = useAccurateModel
+    ? [GEMINI_ACCURATE_MODEL, ...GEMINI_FALLBACK_MODELS]
+    : [GEMINI_FAST_MODEL, GEMINI_ACCURATE_MODEL, ...GEMINI_FALLBACK_MODELS];
+
+  for (const modelName of models) {
     let retried429 = false;
 
     while (true) {
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+
+      const elapsed = performance.now() - startedAt;
+      const remaining = TOTAL_DEADLINE_MS - elapsed;
+      if (remaining <= 0) {
+        throw new Error("Gemini request deadline exceeded.");
+      }
 
       const controller = new AbortController();
       const forwardAbort = () => controller.abort();
       signal.addEventListener("abort", forwardAbort, { once: true });
       const timeoutId = window.setTimeout(
         () => controller.abort(),
-        REQUEST_TIMEOUT_MS
+        Math.min(REQUEST_TIMEOUT_MS, Math.max(250, remaining))
       );
 
       try {
@@ -336,10 +359,24 @@ async function fetchGeminiText(
               "x-goog-api-key": apiKey,
             },
             body: JSON.stringify({
+              // Giữ phần system prompt ổn định để tăng cơ hội implicit cache hit.
+              // Chỉ thị ngôn ngữ được đặt ở cuối system prompt để thắng các rule cũ trong aiPrompt.
               systemInstruction: {
                 parts: [
                   {
-                    text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp.\n- Ưu tiên 2-5 câu ngắn hoặc các gạch đầu dòng cần thiết.\n- Không suy đoán thông tin cá nhân chưa có.\n- Không lặp lại câu hỏi của người dùng.\n- Trả lời đúng ngôn ngữ của câu hỏi hiện tại theo chỉ thị bên dưới.\n\n${getLanguageInstruction(responseLanguage)}`,
+                    text: `${SYSTEM_INSTRUCTION}
+
+QUY TẮC CHATBOX PORTFOLIO:
+- Chỉ trả lời dựa trên thông tin portfolio được cung cấp.
+- Ưu tiên câu trả lời ngắn, trực tiếp và đúng trọng tâm.
+- Mặc định tối đa 3 ý chính; chỉ mở rộng khi người dùng yêu cầu chi tiết hoặc liệt kê đầy đủ.
+- Không bịa, không suy đoán dữ kiện cá nhân, thời gian, chức danh hoặc thành tích.
+- Nếu portfolio không có thông tin, nói rõ rằng thông tin đó chưa được cung cấp.
+- Giữ nguyên tên dự án, công nghệ và mốc thời gian chính xác như portfolio.
+- Không lặp lại câu hỏi của người dùng.
+
+FINAL OUTPUT LANGUAGE RULE (HIGHEST PRIORITY FOR THIS REQUEST):
+${getLanguageInstruction(responseLanguage)}`,
                   },
                 ],
               },
@@ -348,7 +385,7 @@ async function fetchGeminiText(
                 thinkingConfig: {
                   thinkingLevel: "minimal",
                 },
-                maxOutputTokens: 800,
+                maxOutputTokens: useAccurateModel ? 600 : 420,
               },
             }),
             signal: controller.signal,
@@ -383,28 +420,25 @@ async function fetchGeminiText(
         lastStatus = response.status;
         lastBody = await readErrorBody(response);
 
-        // API key / quyền truy cập sai: dừng ngay để báo lỗi rõ ràng.
-        if (
-          response.status === 400 ||
-          response.status === 401 ||
-          response.status === 403
-        ) {
+        if (response.status === 400 || response.status === 401 || response.status === 403) {
           throw new Error(getApiErrorMessage(response.status, lastBody));
         }
 
-        // 429: retry đúng 1 lần với delay rất ngắn, sau đó mới failover.
+        // 429: retry đúng 1 lần nếu vẫn còn đủ thời gian.
         if (response.status === 429 && !retried429) {
-          retried429 = true;
-          await sleep(RETRY_DELAY_MS);
-          continue;
+          const remainingAfter429 = TOTAL_DEADLINE_MS - (performance.now() - startedAt);
+          if (remainingAfter429 > RETRY_DELAY_MS + 700) {
+            retried429 = true;
+            await sleep(RETRY_DELAY_MS);
+            continue;
+          }
         }
 
-        // 503/5xx/408: không retry trên cùng model, chuyển model ngay.
+        // 5xx/timeout: chuyển model ngay, không lặp nhiều lần trên cùng model.
         if (FAILOVER_STATUS.has(response.status)) {
           break;
         }
 
-        // Mã lỗi ngoài danh sách: chuyển model để tăng khả năng phục hồi.
         break;
       } catch (error) {
         if (isAbortError(error)) {
@@ -414,10 +448,7 @@ async function fetchGeminiText(
           break;
         }
 
-        if (
-          error instanceof Error &&
-          error.message.startsWith("Gemini API Error")
-        ) {
+        if (error instanceof Error && error.message.startsWith("Gemini API Error")) {
           throw error;
         }
 
@@ -584,7 +615,8 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
 
     requestAnimationFrame(() => {
       chatEndRef.current?.scrollIntoView({
-        behavior: "smooth",
+        // Không smooth khi typewriter cập nhật liên tục; tránh jank và trễ UI.
+        behavior: "auto",
         block: "end",
       });
     });
@@ -664,21 +696,14 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
         timestamp: formatMessageTime(now, currentLang),
       };
 
-      // Trích xuất tối đa 8 tin nhắn gần nhất làm ngữ cảnh hội thoại (Context)
+      // Chỉ gửi vài lượt gần nhất và cắt mỗi lượt để giảm input token + nhiễu.
       const recentMessages = messages
-        .filter(
-          (message) =>
-            message.id !== "welcome" &&
-            message.text.trim() !== ""
-        )
-        .slice(-8);
+        .filter((message) => message.id !== "welcome" && message.text.trim() !== "")
+        .slice(-MAX_HISTORY_MESSAGES);
 
       const historyContents = recentMessages.map((message) => ({
-        role:
-          message.sender === "user"
-            ? ("user" as const)
-            : ("model" as const),
-        parts: [{ text: message.text }],
+        role: message.sender === "user" ? ("user" as const) : ("model" as const),
+        parts: [{ text: message.text.slice(0, MAX_HISTORY_CHARS) }],
       }));
 
       const languageLabel =
@@ -688,7 +713,15 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
             ? "KOREAN"
             : "VIETNAMESE";
 
-      const latestUserPrompt = `[RESPONSE LANGUAGE: ${languageLabel}]\nRespond ONLY in ${languageLabel}. Do not switch to another language.\n\nUSER QUESTION:\n${query}`;
+      const latestUserPrompt = `[RESPONSE LANGUAGE: ${languageLabel}]\nAnswer ONLY in ${languageLabel}. Never switch language.\nUse only facts from the portfolio. If a fact is not available, say so.\n\nUSER QUESTION:\n${query}`;
+
+      // Chọn model theo độ phức tạp của câu hỏi: FAQ ngắn → Flash-Lite;
+      // câu hỏi nhiều ý/giải thích kỹ → Flash để tăng độ chính xác.
+      const lowerQuery = query.toLowerCase();
+      const useAccurateModel =
+        query.length > 140 ||
+        (query.match(/[?？！]/g)?.length ?? 0) >= 2 ||
+        /\b(why|how|explain|compare|difference|detail|detailed|architecture|technical|vì sao|tại sao|như thế nào|giải thích|so sánh|chi tiết|kiến trúc|kỹ thuật|왜|어떻게|설명|비교|자세히|기술)\b/i.test(lowerQuery);
 
       const apiContents = [
         ...historyContents,
@@ -719,20 +752,30 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
           apiKey,
           apiContents,
           responseLanguage,
-          controller.signal
+          controller.signal,
+          useAccurateModel
         );
 
-        // Hiệu ứng chữ chạy từng đoạn (Typewriter effect)
-        let typedText = "";
-        const CHARS_PER_TICK = 4;
-        const TICK_MS = 16;
+        // Câu ngắn vẫn có typewriter; câu dài hiển thị ngay để hiệu ứng
+        // không cộng thêm hàng chục giây vào thời gian người dùng phải chờ.
+        if (answerText.length > MAX_TYPEWRITER_CHARS) {
+          updateMessage(aiMsgId, answerText);
+        } else {
+          let typedText = "";
+          for (
+            let index = 0;
+            index < answerText.length;
+            index += TYPEWRITER_CHARS_PER_TICK
+          ) {
+            if (controller.signal.aborted) return;
 
-        for (let index = 0; index < answerText.length; index += CHARS_PER_TICK) {
-          if (controller.signal.aborted) return;
-
-          typedText += answerText.slice(index, index + CHARS_PER_TICK);
-          updateMessage(aiMsgId, typedText);
-          await sleep(TICK_MS);
+            typedText += answerText.slice(
+              index,
+              index + TYPEWRITER_CHARS_PER_TICK
+            );
+            updateMessage(aiMsgId, typedText);
+            await sleep(TYPEWRITER_TICK_MS);
+          }
         }
       } catch (error) {
         if (isAbortError(error)) {
