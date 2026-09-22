@@ -91,33 +91,38 @@ const CHATBOX_I18N = {
   },
 } as const;
 
-/** Gemini 3.8 Flash là model chính: cao hơn, mới hơn và vẫn có low thinking cho chat nhanh. */
-const GEMINI_PRIMARY_MODEL = "gemini-3.8-flash" as const;
+/**
+ * Danh sách model Gemini dùng cho chatbot portfolio.
+ * Ưu tiên model Flash-Lite có độ trễ thấp, sau đó mới chuyển sang model dự phòng.
+ * Lưu ý: Gemini 3.8/3.7 không cần thiết cho chatbot FAQ và có thể chịu tải cao hơn.
+ */
+const GEMINI_FAST_MODEL = "gemini-3.8-flash" as const;
+const GEMINI_ACCURATE_MODEL = "gemini-3.8-flash" as const;
 const GEMINI_FALLBACK_MODELS = [
+  "gemini-3.7-flash",
   "gemini-3.6-flash",
-  "gemini-3.5-flash",
   "gemini-2.5-flash",
 ] as const;
 
-/** Lỗi tạm thời: đổi model nhanh; 429 được retry một lần. */
-const FAILOVER_STATUS = new Set([404, 408, 500, 502, 503, 504]);
-const RETRY_DELAY_MS = 300;
-
-/** Không cắt request quá sớm; vẫn có deadline để tránh loading vô hạn. */
+/** Mã lỗi có thể chuyển model ngay để giảm thời gian chờ */
+const FAILOVER_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+/** Retry 429 chỉ một lần và delay rất ngắn */
+const RETRY_DELAY_MS = 250;
+/** Timeout cho một model: đủ rộng cho mạng quốc tế nhưng vẫn nhanh với chatbot */
 const REQUEST_TIMEOUT_MS = 6500;
-const TOTAL_DEADLINE_MS = 20000;
-
-/** Giới hạn output/context để giảm latency và giữ câu trả lời đúng trọng tâm. */
+/** Deadline tổng của một lượt hỏi; không để chuỗi fallback kéo dài */
+const TOTAL_DEADLINE_MS = 10000;
+/** Giới hạn câu trả lời ở mức đủ dùng cho portfolio FAQ */
 const MAX_ANSWER_CHARS = 1800;
-const MAX_HISTORY_MESSAGES = 3;
-const MAX_HISTORY_CHARS = 350;
-
-/** Typewriter chỉ thêm hiệu ứng, không được phép tạo độ trễ đáng kể. */
+/** Giới hạn context để giảm input token và tránh mang lỗi cũ vào lượt mới */
+const MAX_HISTORY_MESSAGES = 4;
+const MAX_HISTORY_CHARS = 500;
+/** Chỉ typewriter với câu ngắn để hiệu ứng không tạo thêm độ trễ đáng kể */
 const MAX_TYPEWRITER_CHARS = 700;
-const TYPEWRITER_CHARS_PER_TICK = 20;
+const TYPEWRITER_CHARS_PER_TICK = 14;
 const TYPEWRITER_TICK_MS = 8;
 
-/** Endpoint Gemini Generate Content. */
+/** Endpoint gốc của Google Gemini API */
 const API_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -318,7 +323,6 @@ function isTechnicalAssistantMessage(text: string): boolean {
  * Thực hiện gọi API Google Gemini
  * Có tích hợp: Tự động Retry khi lỗi mạng, tự chuyển Model khi thất bại, Timeout handling
  */
-/** Gọi Gemini 3.8 Flash với failover nhanh và timeout có kiểm soát. */
 async function fetchGeminiText(
   apiKey: string,
   apiContents: Array<{
@@ -333,37 +337,31 @@ async function fetchGeminiText(
   let lastStatus = 0;
   let lastBody = "";
 
-  // 3.8 là model chính; bỏ 3.7 khỏi chuỗi fallback để giảm thêm một hop khi 3.8 đang quá tải.
-  const models = [GEMINI_PRIMARY_MODEL, ...GEMINI_FALLBACK_MODELS];
+  // FAQ ngắn -> Flash-Lite. Câu hỏi kỹ thuật/giải thích -> Flash.
+  // Các model fallback vẫn là model Stable hiện tại của Gemini 3.
+  const models = useAccurateModel
+    ? [GEMINI_ACCURATE_MODEL, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"]
+    : [GEMINI_FAST_MODEL, "gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"];
 
   for (const modelName of models) {
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-   const elapsed = performance.now() - startedAt;
-  const remaining = TOTAL_DEADLINE_MS - elapsed;
+    let retried429 = false;
+    const elapsed = performance.now() - startedAt;
+    const remaining = TOTAL_DEADLINE_MS - elapsed;
+    if (remaining <= 0) break;
 
-  if (remaining <= 0) {
-    break;
-  }
-
-  const controller = new AbortController();
-  const forwardAbort = () => controller.abort();
-
-  signal.addEventListener("abort", forwardAbort, { once: true });
-
-  const timeoutId = window.setTimeout(
-    () => controller.abort(),
-    Math.min(
-      REQUEST_TIMEOUT_MS,
-      Math.max(1500, remaining)
-    )
-  );
+    const controller = new AbortController();
+    const forwardAbort = () => controller.abort();
+    signal.addEventListener("abort", forwardAbort, { once: true });
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      Math.min(REQUEST_TIMEOUT_MS, Math.max(400, remaining))
+    );
 
     try {
-      // Tất cả model đều dùng low để giảm latency; câu hỏi dài vẫn ưu tiên chất lượng
-      // nhờ model 3.8 nhưng không bật medium vì đó là nguyên nhân chính làm chậm.
-      const thinkingLevel = "low";
-      const maxOutputTokens = useAccurateModel ? 600 : 420;
+      const thinkingLevel = useAccurateModel ? "low" : "minimal";
+      const maxOutputTokens = useAccurateModel ? 520 : 340;
 
       const response = await fetch(
         `${API_BASE_URL}/${modelName}:generateContent`,
@@ -378,13 +376,15 @@ async function fetchGeminiText(
             systemInstruction: {
               parts: [
                 {
-                  text: `${SYSTEM_INSTRUCTION}\n\nCHATBOX RULES:\n- Answer only from portfolio facts provided in the system instruction.\n- Be direct and concise; default to 2-4 short points.\n- Never invent dates, roles, achievements, technologies, or personal facts.\n- Keep project names and technical terms exact.\n- If information is unavailable, say so clearly.\n- Do not repeat the user's question.\n- Use the user's language for the answer.\n\n${getLanguageInstruction(responseLanguage)}`,
+                  text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp.\n- Trả lời trực tiếp, đủ ý, không lan man.\n- Câu hỏi thông thường: tối đa 3 ý chính.\n- Chỉ mở rộng khi người dùng yêu cầu chi tiết.\n- Không bịa, không suy đoán dữ kiện cá nhân, thời gian, chức danh hoặc thành tích.\n- Nếu portfolio không có thông tin, nói rõ thông tin đó chưa được cung cấp.\n- Giữ nguyên tên dự án, công nghệ và mốc thời gian.\n- Không lặp lại câu hỏi.\n\nFINAL OUTPUT LANGUAGE RULE (HIGHEST PRIORITY):\n${getLanguageInstruction(responseLanguage)}`,
                 },
               ],
             },
             contents: apiContents,
             generationConfig: {
-              thinkingConfig: { thinkingLevel },
+              thinkingConfig: {
+                thinkingLevel,
+              },
               maxOutputTokens,
             },
           }),
@@ -395,6 +395,8 @@ async function fetchGeminiText(
       if (response.ok) {
         const data = await response.json();
         const parts = data?.candidates?.[0]?.content?.parts;
+        const finishReason = data?.candidates?.[0]?.finishReason;
+
         const text = Array.isArray(parts)
           ? parts
               .map((part: { text?: unknown }) =>
@@ -405,42 +407,53 @@ async function fetchGeminiText(
           : "";
 
         if (text) {
-          console.debug(`[CKy] ${modelName} ${Math.round(performance.now() - startedAt)}ms`);
+          const elapsedMs = Math.round(performance.now() - startedAt);
+          console.debug(`[CKy] ${modelName} responded in ${elapsedMs}ms`);
           return text.slice(0, MAX_ANSWER_CHARS);
         }
 
-        lastStatus = 200;
-        lastBody = "Gemini returned no text.";
-        return "";
+        if (finishReason === "MAX_TOKENS") {
+          lastStatus = 200;
+          lastBody = "Gemini output token limit reached.";
+        } else {
+          lastStatus = 200;
+          lastBody = "Gemini returned response without text content.";
+        }
+      } else {
+        lastStatus = response.status;
+        lastBody = await readErrorBody(response);
+
+        // 400/401/403 là lỗi request/key/quyền: không đổi model mù quáng.
+        if (response.status === 400 || response.status === 401 || response.status === 403) {
+          throw new Error(getApiErrorMessage(response.status, lastBody));
+        }
+
+        // 429: retry một lần cực ngắn nếu deadline còn đủ.
+        if (response.status === 429 && !retried429) {
+          const remainingAfter429 = TOTAL_DEADLINE_MS - (performance.now() - startedAt);
+          if (remainingAfter429 > RETRY_DELAY_MS + 500) {
+            retried429 = true;
+            await sleep(RETRY_DELAY_MS);
+            continue;
+          }
+        }
+
+        // 5xx/408: bỏ model hiện tại và chuyển model tiếp theo ngay.
+        if (FAILOVER_STATUS.has(response.status)) {
+          break;
+        }
       }
-
-      lastStatus = response.status;
-      lastBody = await readErrorBody(response);
-
-      // Key/request errors cannot be fixed by changing model.
-      if ([400, 401, 403].includes(response.status)) {
-        throw new Error(getApiErrorMessage(response.status, lastBody));
-      }
-
-      // 429 and 5xx: bỏ model ngay để giữ tốc độ.
-      if (FAILOVER_STATUS.has(response.status) || response.status === 429) {
-        return "";
-      }
-
-      return "";
     } catch (error) {
       if (isAbortError(error)) {
         if (signal.aborted) throw error;
         lastStatus = 504;
         lastBody = "Request timeout";
-        return "";
-      }
-      if (error instanceof Error && error.message.startsWith("Gemini API Error")) {
+      } else if (error instanceof Error && error.message.startsWith("Gemini API Error")) {
         throw error;
+      } else {
+        lastStatus = 0;
+        lastBody = error instanceof Error ? error.message : String(error);
       }
-      lastStatus = 0;
-      lastBody = error instanceof Error ? error.message : String(error);
-      return "";
     } finally {
       window.clearTimeout(timeoutId);
       signal.removeEventListener("abort", forwardAbort);
