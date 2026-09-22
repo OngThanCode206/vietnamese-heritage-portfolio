@@ -91,48 +91,41 @@ const CHATBOX_I18N = {
   },
 } as const;
 
-/**
- * Danh sách model Gemini dùng cho chatbot portfolio.
- * Ưu tiên model Flash-Lite có độ trễ thấp, sau đó mới chuyển sang model dự phòng.
- * Lưu ý: Gemini 3.8/3.7 không cần thiết cho chatbot FAQ và có thể chịu tải cao hơn.
- */
-const GEMINI_FAST_MODEL = "gemini-3.5-flash-lite" as const;
-const GEMINI_ACCURATE_MODEL = "gemini-3.5-flash" as const;
-const GEMINI_FALLBACK_MODELS = [
-  "gemini-3.1-flash-lite",
-  "gemini-3.6-flash",
-] as const;
 
-/** Mã lỗi có thể chuyển model ngay để giảm thời gian chờ */
-const FAILOVER_STATUS = new Set([408, 429, 500, 502, 503, 504]);
-/** Retry 429 chỉ một lần và delay rất ngắn */
-const RETRY_DELAY_MS = 250;
-/** Timeout cho một model: đủ rộng cho mạng quốc tế nhưng vẫn nhanh với chatbot */
-const REQUEST_TIMEOUT_MS = 6500;
-/** Deadline tổng của một lượt hỏi; không để chuỗi fallback kéo dài */
-const TOTAL_DEADLINE_MS = 10000;
-/** Giới hạn câu trả lời ở mức đủ dùng cho portfolio FAQ */
-const MAX_ANSWER_CHARS = 1800;
-/** Giới hạn context để giảm input token và tránh mang lỗi cũ vào lượt mới */
-const MAX_HISTORY_MESSAGES = 4;
-const MAX_HISTORY_CHARS = 500;
-/** Chỉ typewriter với câu ngắn để hiệu ứng không tạo thêm độ trễ đáng kể */
-const MAX_TYPEWRITER_CHARS = 700;
-const TYPEWRITER_CHARS_PER_TICK = 14;
-const TYPEWRITER_TICK_MS = 8;
+// ==========================================
+// 2. CẤU HÌNH GEMINI + PERFORMANCE
+// ==========================================
 
-/** Endpoint gốc của Google Gemini API */
+const GEMINI_MODELS = {
+  fast: ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.1-flash-lite"],
+  accurate: ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"],
+} as const;
+
 const API_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
 
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const RETRY_DELAY_MS = 250;
+const REQUEST_TIMEOUT_MS = 6000;
+const TOTAL_DEADLINE_MS = 9500;
+
+const MAX_HISTORY_MESSAGES = 4;
+const MAX_HISTORY_CHARS = 450;
+const MAX_ANSWER_CHARS = 1800;
+
+const CACHE_TTL_MS = 60_000;
+const responseCache = new Map<
+  string,
+  { text: string; expiresAt: number }
+>();
+
+const TYPEWRITER_LIMIT = 450;
+const TYPEWRITER_CHUNK = 30;
+
 // ==========================================
-// 3. CÁC HÀM BỔ TRỢ (HELPER FUNCTIONS)
+// 3. HELPER
 // ==========================================
 
-/**
- * Tạo ID ngẫu nhiên duy nhất cho tin nhắn
- * @param prefix Tiền tố định danh (ví dụ: 'user' hoặc 'ai')
- */
 function createId(prefix: string): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `${prefix}-${crypto.randomUUID()}`;
@@ -140,159 +133,153 @@ function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-/**
- * Định dạng giờ tin nhắn theo dạng HH:mm theo đúng định dạng ngôn ngữ
- */
-function formatMessageTime(date: Date, lang: ResponseLanguage = "vi"): string {
-  const localeMap = { vi: "vi-VN", en: "en-US", ko: "ko-KR" };
-  return date.toLocaleTimeString(localeMap[lang] || "vi-VN", {
+function formatMessageTime(
+  date: Date,
+  lang: ResponseLanguage = "vi"
+): string {
+  const locale = { vi: "vi-VN", en: "en-US", ko: "ko-KR" }[lang];
+  return date.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
 }
 
-/**
- * Định dạng giờ cho widget Đồng hồ thời gian thực (VD: 5:27 pm)
- */
 function formatLiveTime(date: Date): string {
-  return date
-    .toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    })
-    .toLowerCase();
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).toLowerCase();
 }
 
-/**
- * Định dạng ngày cho widget Đồng hồ thời gian thực (DD/MM/YYYY)
- */
 function formatLiveDate(date: Date): string {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  return `${String(date.getDate()).padStart(2, "0")}/${String(
+    date.getMonth() + 1
+  ).padStart(2, "0")}/${date.getFullYear()}`;
 }
 
-/**
- * Hàm tạm dừng thực thi trong một khoảng thời gian
- * @param ms Số mili-giây cần tạm dừng
- */
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-/**
- * Kiểm tra xem lỗi phát sinh có phải do AbortController ngắt request không
- */
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-/**
- * Tự động nhận diện ngôn ngữ của câu hỏi nhập vào (Việt / Anh / Hàn)
- * @param text Đoạn văn bản người dùng nhập
- * @param currentUiLang Ngôn ngữ hiện tại của UI để fallback
- */
-function detectResponseLanguage(text: string, currentUiLang: ResponseLanguage): ResponseLanguage {
+function detectResponseLanguage(
+  text: string,
+  fallback: ResponseLanguage
+): ResponseLanguage {
   const normalized = text.toLowerCase().trim();
 
-  // 1. Chữ Hàn là tín hiệu mạnh và gần như không mơ hồ.
-  const koreanChars = normalized.match(/[가-힣ㄱ-ㅎㅏ-ㅣ]/g)?.length ?? 0;
-  if (koreanChars >= 2) return "ko";
+  if ((normalized.match(/[가-힣ㄱ-ㅎㅏ-ㅣ]/g)?.length ?? 0) >= 2) {
+    return "ko";
+  }
 
-  // 2. Dấu tiếng Việt là tín hiệu mạnh nhất cho tiếng Việt.
-  if (/[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i.test(normalized)) {
+  if (
+    /[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]/i.test(
+      normalized
+    )
+  ) {
     return "vi";
   }
 
   const words = normalized.match(/[a-zA-ZÀ-ỹĐđ]+/g) ?? [];
-  const vietnameseWords = new Set([
+
+  const viWords = new Set([
     "xin", "chao", "chào", "anh", "chi", "chị", "em", "toi", "tôi",
-    "minh", "mình", "ky", "kỳ", "dang", "đang", "lam", "làm",
-    "gi", "gì", "nao", "nào", "du", "dự", "an", "án", "hoc", "học",
-    "van", "vấn", "de", "đề", "kinh", "nghiem", "nghiệm", "thanh",
-    "tich", "tích", "truong", "trường", "cong", "nghe", "công", "nghệ",
-    "duoc", "được", "khong", "không", "co", "có", "nhung", "những",
-    "cua", "của", "voi", "với", "the", "thế", "gioi", "giới", "bao",
-    "nhieu", "nhiều", "nhat", "nhất", "la", "là", "va", "và", "hay",
-    "gioi", "giỏi", "duan", "dự án",
+    "minh", "mình", "ky", "kỳ", "dang", "đang", "lam", "làm", "gi", "gì",
+    "nao", "nào", "du", "dự", "an", "án", "hoc", "học", "van", "vấn",
+    "de", "đề", "kinh", "nghiem", "nghiệm", "thanh", "tich", "tích",
+    "truong", "trường", "cong", "nghe", "công", "nghệ", "duoc", "được",
+    "khong", "không", "co", "có", "nhung", "những", "cua", "của", "voi",
+    "với", "the", "thế", "gioi", "giới", "bao", "nhieu", "nhiều", "nhat",
+    "nhất", "la", "là", "va", "và", "hay", "gioi", "giỏi", "duan", "dự án",
   ]);
 
-  const englishWords = new Set([
+  const enWords = new Set([
     "hello", "hi", "hey", "thanks", "thank", "please", "what", "who",
     "where", "when", "why", "how", "which", "can", "could", "would",
     "tell", "show", "about", "project", "projects", "experience", "skill",
-    "skills", "education", "achievement", "achievements", "student", "developer",
-    "work", "working", "study", "studying", "portfolio", "contact", "email",
-    "is", "are", "do", "does", "did", "has", "have", "and", "or", "the",
-    "my", "your", "his", "her", "their", "this", "that", "with", "from",
+    "skills", "education", "achievement", "achievements", "student",
+    "developer", "work", "working", "study", "studying", "portfolio",
+    "contact", "email", "is", "are", "do", "does", "did", "has", "have",
+    "and", "or", "the", "my", "your", "his", "her", "their", "this",
+    "that", "with", "from",
   ]);
 
-  const viScore = words.reduce<number>((score, word) => score + (vietnameseWords.has(word) ? 1 : 0), 0);
-  const enScore = words.reduce<number>((score, word) => score + (englishWords.has(word) ? 1 : 0), 0);
+  const viScore = words.filter((word) => viWords.has(word)).length;
+  const enScore = words.filter((word) => enWords.has(word)).length;
 
-  // Câu tiếng Việt không dấu vẫn được ưu tiên nếu có từ đặc trưng.
-  if (viScore >= 1 && viScore >= enScore) return "vi";
-  if (enScore >= 1) return "en";
-
-  // Nếu toàn bộ ký tự Latin và không có dấu tiếng Việt, dùng UI language.
-  // Điều này giữ hành vi ổn định với các câu cực ngắn/đặc biệt.
-  if (words.length > 0 && words.length >= 2) {
-    const latinOnly = words.join(" ").replace(/[^a-zA-Z\s]/g, "").trim();
-    if (latinOnly && currentUiLang === "en") return "en";
-  }
-
-  return currentUiLang;
+  if (viScore > enScore && viScore > 0) return "vi";
+  if (enScore > 0) return "en";
+  return fallback;
 }
 
-/**
- * Bổ sung chỉ thị ép buộc ngôn ngữ cho Prompt gửi sang Gemini API
- */
-function getLanguageInstruction(language: ResponseLanguage): string {
+function languageInstruction(language: ResponseLanguage): string {
   if (language === "en") {
-    return `
-LANGUAGE OVERRIDE FOR THIS REQUEST:
-- The user's message is in ENGLISH.
-- You MUST answer in ENGLISH only.
-- Do NOT answer in Vietnamese or Korean.
-`;
+    return "Respond ONLY in English. Do not switch to Vietnamese or Korean.";
   }
-
   if (language === "ko") {
-    return `
-LANGUAGE OVERRIDE FOR THIS REQUEST:
-- The user's message is in KOREAN.
-- You MUST answer in KOREAN only (한국어).
-- Do NOT answer in Vietnamese or English.
-`;
+    return "한국어로만 답변하세요. 베트남어 또는 영어로 전환하지 마세요.";
   }
-
-  return `
-LANGUAGE OVERRIDE FOR THIS REQUEST:
-- The user's message is in VIETNAMESE.
-- You MUST answer in VIETNAMESE only.
-`;
+  return "Chỉ trả lời bằng tiếng Việt. Không chuyển sang tiếng Anh hoặc tiếng Hàn.";
 }
 
-/**
- * Trích xuất chuỗi thông báo lỗi chi tiết từ Response của Gemini API
- */
+function isComplexQuestion(query: string): boolean {
+  return (
+    query.length > 120 ||
+    (query.match(/[?？!！]/g)?.length ?? 0) >= 2 ||
+    /\b(why|how|explain|compare|difference|detail|detailed|architecture|technical|technology|vì sao|tại sao|như thế nào|giải thích|so sánh|chi tiết|kiến trúc|kỹ thuật|công nghệ|왜|어떻게|설명|비교|자세히|기술)\b/i.test(
+      query
+    )
+  );
+}
+
+function getCacheKey(
+  language: ResponseLanguage,
+  query: string
+): string {
+  return `${language}:${query.toLowerCase().trim()}`;
+}
+
+function getCachedResponse(key: string): string | null {
+  const cached = responseCache.get(key);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    responseCache.delete(key);
+    return null;
+  }
+
+  return cached.text;
+}
+
+function setCachedResponse(key: string, text: string): void {
+  responseCache.set(key, {
+    text,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+
+  if (responseCache.size > 30) {
+    const firstKey = responseCache.keys().next().value;
+    if (firstKey) responseCache.delete(firstKey);
+  }
+}
+
 function getApiErrorMessage(status: number, body: string): string {
   let detail = "";
+
   try {
-    const parsed = JSON.parse(body);
-    detail = parsed?.error?.message || "";
+    detail = JSON.parse(body)?.error?.message ?? "";
   } catch {
     detail = body;
   }
+
   return `Gemini API Error ${status}${detail ? `: ${detail}` : ""}`;
 }
 
-/**
- * Đọc nội dung text từ Response Body một cách an toàn
- */
 async function readErrorBody(response: Response): Promise<string> {
   try {
     return await response.text();
@@ -301,90 +288,110 @@ async function readErrorBody(response: Response): Promise<string> {
   }
 }
 
-function isTechnicalAssistantMessage(text: string): boolean {
-  const value = text.toLowerCase();
-  return (
-    value.includes("gemini api") ||
-    value.includes("hệ thống ai chưa thể") ||
-    value.includes("dịch vụ gemini") ||
-    value.includes("the ai service could not") ||
-    value.includes("gemini api key") ||
-    value.includes("현재 ai 서비스") ||
-    value.includes("gemini가 요청")
-  );
+function getFriendlyErrorMessage(
+  error: unknown,
+  lang: ResponseLanguage
+): string {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  if (lang === "en") {
+    if (message.includes("401") || message.includes("403")) {
+      return "⚠️ The Gemini API key is invalid or does not have access to this model.";
+    }
+    if (message.includes("429") || message.includes("quota")) {
+      return "⏳ Gemini is temporarily rate-limited. Please try again in a few seconds.";
+    }
+    return "⚠️ The AI service is temporarily unavailable. Please try again shortly.";
+  }
+
+  if (lang === "ko") {
+    if (message.includes("401") || message.includes("403")) {
+      return "⚠️ Gemini API 키가 올바르지 않거나 이 모델에 대한 접근 권한이 없습니다.";
+    }
+    if (message.includes("429") || message.includes("quota")) {
+      return "⏳ 현재 Gemini 요청이 많습니다. 잠시 후 다시 시도해 주세요.";
+    }
+    return "⚠️ 현재 AI 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+  }
+
+  if (message.includes("401") || message.includes("403")) {
+    return "⚠️ Gemini API key không hợp lệ hoặc chưa có quyền dùng model này.";
+  }
+  if (message.includes("429") || message.includes("quota")) {
+    return "⏳ Gemini đang giới hạn lưu lượng. Anh/Chị vui lòng thử lại sau vài giây nhé!";
+  }
+  return "⚠️ Hệ thống AI đang tạm thời không khả dụng. Anh/Chị vui lòng thử lại sau ít giây nhé!";
 }
 
 // ==========================================
-// 4. HÀM GỌI API GEMINI (CORE NETWORK LOGIC)
+// 4. GEMINI API
 // ==========================================
 
-/**
- * Thực hiện gọi API Google Gemini
- * Có tích hợp: Tự động Retry khi lỗi mạng, tự chuyển Model khi thất bại, Timeout handling
- */
 async function fetchGeminiText(
   apiKey: string,
-  apiContents: Array<{
+  contents: Array<{
     role: "user" | "model";
     parts: Array<{ text: string }>;
   }>,
   responseLanguage: ResponseLanguage,
   signal: AbortSignal,
-  useAccurateModel: boolean
+  complex: boolean
 ): Promise<string> {
+  const models = complex ? GEMINI_MODELS.accurate : GEMINI_MODELS.fast;
   const startedAt = performance.now();
+
   let lastStatus = 0;
   let lastBody = "";
 
-  // FAQ ngắn -> Flash-Lite. Câu hỏi kỹ thuật/giải thích -> Flash.
-  // Các model fallback vẫn là model Stable hiện tại của Gemini 3.
-  const models = useAccurateModel
-    ? [GEMINI_ACCURATE_MODEL, "gemini-3.6-flash", GEMINI_FAST_MODEL, "gemini-3.1-flash-lite"]
-    : [GEMINI_FAST_MODEL, "gemini-3.1-flash-lite", "gemini-3.6-flash", GEMINI_ACCURATE_MODEL];
-
-  for (const modelName of models) {
+  for (const model of models) {
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-    let retried429 = false;
-    const elapsed = performance.now() - startedAt;
-    const remaining = TOTAL_DEADLINE_MS - elapsed;
-    if (remaining <= 0) break;
+    const remaining = TOTAL_DEADLINE_MS - (performance.now() - startedAt);
+    if (remaining <= 300) break;
 
     const controller = new AbortController();
-    const forwardAbort = () => controller.abort();
-    signal.addEventListener("abort", forwardAbort, { once: true });
-    const timeoutId = window.setTimeout(
+    const onAbort = () => controller.abort();
+    signal.addEventListener("abort", onAbort, { once: true });
+
+    const timeout = window.setTimeout(
       () => controller.abort(),
-      Math.min(REQUEST_TIMEOUT_MS, Math.max(400, remaining))
+      Math.min(REQUEST_TIMEOUT_MS, Math.max(1000, remaining))
     );
 
     try {
-      const thinkingLevel = useAccurateModel ? "low" : "minimal";
-      const maxOutputTokens = useAccurateModel ? 520 : 340;
-
       const response = await fetch(
-        `${API_BASE_URL}/${modelName}:generateContent`,
+        `${API_BASE_URL}/${model}:generateContent`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Accept: "application/json",
             "x-goog-api-key": apiKey,
           },
           body: JSON.stringify({
             systemInstruction: {
               parts: [
                 {
-                  text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp.\n- Trả lời trực tiếp, đủ ý, không lan man.\n- Câu hỏi thông thường: tối đa 3 ý chính.\n- Chỉ mở rộng khi người dùng yêu cầu chi tiết.\n- Không bịa, không suy đoán dữ kiện cá nhân, thời gian, chức danh hoặc thành tích.\n- Nếu portfolio không có thông tin, nói rõ thông tin đó chưa được cung cấp.\n- Giữ nguyên tên dự án, công nghệ và mốc thời gian.\n- Không lặp lại câu hỏi.\n\nFINAL OUTPUT LANGUAGE RULE (HIGHEST PRIORITY):\n${getLanguageInstruction(responseLanguage)}`,
+                  text: [
+                    SYSTEM_INSTRUCTION,
+                    "",
+                    "CHATBOX RULES:",
+                    "- Use only facts from the portfolio.",
+                    "- Answer directly and accurately.",
+                    "- Do not invent personal facts, dates, titles, achievements, or projects.",
+                    "- If the portfolio does not contain a fact, say that it is not provided.",
+                    "- Keep normal answers concise; expand only when asked.",
+                    `- ${languageInstruction(responseLanguage)}`,
+                  ].join("\n"),
                 },
               ],
             },
-            contents: apiContents,
+            contents,
             generationConfig: {
               thinkingConfig: {
-                thinkingLevel,
+                thinkingLevel: complex ? "low" : "minimal",
               },
-              maxOutputTokens,
+              maxOutputTokens: complex ? 520 : 320,
             },
           }),
           signal: controller.signal,
@@ -394,7 +401,6 @@ async function fetchGeminiText(
       if (response.ok) {
         const data = await response.json();
         const parts = data?.candidates?.[0]?.content?.parts;
-        const finishReason = data?.candidates?.[0]?.finishReason;
 
         const text = Array.isArray(parts)
           ? parts
@@ -406,40 +412,87 @@ async function fetchGeminiText(
           : "";
 
         if (text) {
-          const elapsedMs = Math.round(performance.now() - startedAt);
-          console.debug(`[CKy] ${modelName} responded in ${elapsedMs}ms`);
           return text.slice(0, MAX_ANSWER_CHARS);
         }
 
-        if (finishReason === "MAX_TOKENS") {
-          lastStatus = 200;
-          lastBody = "Gemini output token limit reached.";
-        } else {
-          lastStatus = 200;
-          lastBody = "Gemini returned response without text content.";
-        }
-      } else {
-        lastStatus = response.status;
-        lastBody = await readErrorBody(response);
+        lastStatus = 200;
+        lastBody = "Gemini returned no text content.";
+        continue;
+      }
 
-        // 400/401/403 là lỗi request/key/quyền: không đổi model mù quáng.
-        if (response.status === 400 || response.status === 401 || response.status === 403) {
-          throw new Error(getApiErrorMessage(response.status, lastBody));
-        }
+      lastStatus = response.status;
+      lastBody = await readErrorBody(response);
 
-        // 429: retry một lần cực ngắn nếu deadline còn đủ.
-        if (response.status === 429 && !retried429) {
-          const remainingAfter429 = TOTAL_DEADLINE_MS - (performance.now() - startedAt);
-          if (remainingAfter429 > RETRY_DELAY_MS + 500) {
-            retried429 = true;
-            await sleep(RETRY_DELAY_MS);
-            continue;
+      if ([400, 401, 403].includes(response.status)) {
+        throw new Error(getApiErrorMessage(response.status, lastBody));
+      }
+
+      if (!RETRYABLE_STATUS.has(response.status)) {
+        continue;
+      }
+
+      // Chỉ retry 429 một lần; 5xx/timeout chuyển model ngay.
+      if (response.status === 429) {
+        const retryRemaining =
+          TOTAL_DEADLINE_MS - (performance.now() - startedAt);
+
+        if (retryRemaining > RETRY_DELAY_MS + 1200) {
+          await sleep(RETRY_DELAY_MS);
+
+          const retryResponse = await fetch(
+            `${API_BASE_URL}/${model}:generateContent`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": apiKey,
+              },
+              body: JSON.stringify({
+                systemInstruction: {
+                  parts: [
+                    {
+                      text: [
+                        SYSTEM_INSTRUCTION,
+                        "",
+                        "CHATBOX RULES:",
+                        "- Use only facts from the portfolio.",
+                        "- Answer directly and accurately.",
+                        "- Do not invent personal facts, dates, titles, achievements, or projects.",
+                        "- If the portfolio does not contain a fact, say that it is not provided.",
+                        `- ${languageInstruction(responseLanguage)}`,
+                      ].join("\n"),
+                    },
+                  ],
+                },
+                contents,
+                generationConfig: {
+                  thinkingConfig: {
+                    thinkingLevel: complex ? "low" : "minimal",
+                  },
+                  maxOutputTokens: complex ? 520 : 320,
+                },
+              }),
+              signal: controller.signal,
+            }
+          );
+
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            const retryParts = retryData?.candidates?.[0]?.content?.parts;
+            const retryText = Array.isArray(retryParts)
+              ? retryParts
+                  .map((part: { text?: unknown }) =>
+                    typeof part?.text === "string" ? part.text : ""
+                  )
+                  .join("")
+                  .trim()
+              : "";
+
+            if (retryText) return retryText.slice(0, MAX_ANSWER_CHARS);
           }
-        }
 
-        // 5xx/408: bỏ model hiện tại và chuyển model tiếp theo ngay.
-        if (FAILOVER_STATUS.has(response.status)) {
-          break;
+          lastStatus = retryResponse.status;
+          lastBody = await readErrorBody(retryResponse);
         }
       }
     } catch (error) {
@@ -447,15 +500,17 @@ async function fetchGeminiText(
         if (signal.aborted) throw error;
         lastStatus = 504;
         lastBody = "Request timeout";
-      } else if (error instanceof Error && error.message.startsWith("Gemini API Error")) {
+      } else if (
+        error instanceof Error &&
+        error.message.startsWith("Gemini API Error")
+      ) {
         throw error;
       } else {
-        lastStatus = 0;
         lastBody = error instanceof Error ? error.message : String(error);
       }
     } finally {
-      window.clearTimeout(timeoutId);
-      signal.removeEventListener("abort", forwardAbort);
+      window.clearTimeout(timeout);
+      signal.removeEventListener("abort", onAbort);
     }
   }
 
@@ -466,86 +521,18 @@ async function fetchGeminiText(
   );
 }
 
-/**
- * Chuyển các lỗi kỹ thuật thành câu thông báo lỗi thân thiện cho UI người dùng
- */
-function getFriendlyErrorMessage(error: unknown, lang: ResponseLanguage = "vi"): string {
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-
-  if (lang === "en") {
-    if (message.includes("401") || message.includes("403")) {
-      return "⚠️ The Gemini API key is invalid, restricted, or does not have access to this model.";
-    }
-    if (message.includes("400")) {
-      return "⚠️ Gemini rejected the request format. Please try again.";
-    }
-    if (message.includes("429") || message.includes("quota")) {
-      return "⏳ Gemini is rate-limited right now. Please try again in a few seconds.";
-    }
-    if (message.includes("503") || message.includes("502") || message.includes("504") || message.includes("timeout")) {
-      return "⏳ The Gemini service is temporarily unavailable. Please try again in a moment.";
-    }
-    return "⚠️ The AI service could not complete this request. Please try again shortly.";
-  }
-
-  if (lang === "ko") {
-    if (message.includes("401") || message.includes("403")) {
-      return "⚠️ Gemini API 키가 올바르지 않거나 이 모델에 대한 접근 권한이 없습니다.";
-    }
-    if (message.includes("400")) {
-      return "⚠️ Gemini가 요청 형식을 거부했습니다. 다시 시도해 주세요.";
-    }
-    if (message.includes("429") || message.includes("quota")) {
-      return "⏳ 현재 Gemini 요청이 많습니다. 잠시 후 다시 시도해 주세요.";
-    }
-    if (message.includes("503") || message.includes("502") || message.includes("504") || message.includes("timeout")) {
-      return "⏳ 현재 Gemini 서비스가 일시적으로 unavailable 상태입니다. 잠시 후 다시 시도해 주세요.";
-    }
-    return "⚠️ 현재 AI 서비스가 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-  }
-
-  if (message.includes("401") || message.includes("403")) {
-    return "⚠️ Gemini API key không hợp lệ, bị giới hạn hoặc chưa có quyền dùng model này.";
-  }
-  if (message.includes("400")) {
-    return "⚠️ Gemini từ chối định dạng request. Anh/Chị vui lòng thử lại nhé!";
-  }
-  if (message.includes("429") || message.includes("quota")) {
-    return "⏳ Gemini đang giới hạn lưu lượng. Anh/Chị vui lòng thử lại sau vài giây nhé!";
-  }
-  if (
-    message.includes("503") ||
-    message.includes("502") ||
-    message.includes("504") ||
-    message.includes("timeout")
-  ) {
-    return "⏳ Dịch vụ Gemini đang tạm thời quá tải hoặc không khả dụng. Anh/Chị vui lòng thử lại sau ít giây nhé!";
-  }
-
-  return "⚠️ Hệ thống AI chưa thể xử lý yêu cầu này. Anh/Chị vui lòng thử lại sau ít giây nhé!";
-}
-
 // ==========================================
-// 5. COMPONENT CHÍNH (CHATBOX UI)
+// 5. COMPONENT CHÍNH
 // ==========================================
 
 export function Chatbox({ lang = "vi" }: ChatboxProps) {
-  // --- STATE QUẢN LÝ ---
-  /** Ngôn ngữ hiện tại của Chatbox (cho phép chuyển đổi động) */
   const [currentLang, setCurrentLang] = useState<ResponseLanguage>(lang);
-  /** Trạng thái Ẩn/Hiện cửa sổ Chatbox */
   const [isOpen, setIsOpen] = useState(false);
-  /** Trạng thái Ẩn/Hiện bóng gợi ý nổi */
   const [showCloud, setShowCloud] = useState(true);
-  /** Văn bản đang nhập ở ô input */
   const [input, setInput] = useState("");
-  /** Trạng thái AI đang xử lý / gửi yêu cầu */
   const [isLoading, setIsLoading] = useState(false);
-  /** Thời gian hiện tại cho đồng hồ thực */
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
-  /** Danh sách tin nhắn cuộc trò chuyện */
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -555,43 +542,37 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
     },
   ]);
 
-  // --- REFS ---
-  /** Ref hỗ trợ cuộn xuống cuối danh sách tin nhắn */
   const chatEndRef = useRef<HTMLDivElement>(null);
-  /** Ref lưu AbortController để hủy request API khi cẩn thiết */
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  /** Lấy bộ từ từ điển tương ứng với ngôn ngữ đang chọn */
   const t = CHATBOX_I18N[currentLang] || CHATBOX_I18N.vi;
 
-  // --- EFFECTS ---
-
-  /** EFFECT 1: Cập nhật currentLang khi prop `lang` thay đổi */
   useEffect(() => {
     setCurrentLang(lang);
   }, [lang]);
 
-  /** EFFECT 2: Cập nhật tin nhắn chào mặc định khi người dùng chuyển ngôn ngữ */
   useEffect(() => {
     setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === "welcome"
-          ? { ...msg, text: t.welcome }
-          : msg
+      prev.map((message) =>
+        message.id === "welcome"
+          ? { ...message, text: t.welcome }
+          : message
       )
     );
   }, [currentLang, t.welcome]);
 
-  /** EFFECT 3: Khởi chạy đồng hồ đếm thời gian thực và cập nhật timestamp tin nhắn chào */
   useEffect(() => {
     const now = new Date();
     setCurrentTime(now);
 
     setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === "welcome"
-          ? { ...msg, timestamp: formatMessageTime(now, currentLang) }
-          : msg
+      prev.map((message) =>
+        message.id === "welcome"
+          ? {
+              ...message,
+              timestamp: formatMessageTime(now, currentLang),
+            }
+          : message
       )
     );
 
@@ -605,201 +586,144 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
     };
   }, [currentLang]);
 
-  /** EFFECT 4: Tự động cuộn xuống cuối danh sách khi có tin nhắn mới hoặc thay đổi trạng thái */
   useEffect(() => {
     if (!isOpen) return;
 
     requestAnimationFrame(() => {
       chatEndRef.current?.scrollIntoView({
-        // Không smooth khi typewriter cập nhật liên tục; tránh jank và trễ UI.
         behavior: "auto",
         block: "end",
       });
     });
   }, [messages, isLoading, isOpen]);
 
-  // --- HANDLERS & CALLBACKS ---
-
-  /**
-   * Cập nhật nội dung tin nhắn dựa theo ID (dùng cho hiệu ứng gõ chữ Typewriter)
-   */
   const updateMessage = useCallback(
     (messageId: string, text: string) => {
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId ? { ...msg, text } : msg
+        prev.map((message) =>
+          message.id === messageId ? { ...message, text } : message
         )
       );
     },
     []
   );
 
-  /**
-   * CỐT LÕI: Hàm gửi tin nhắn, chuẩn bị Prompt, gọi API và chạy hiệu ứng chữ chạy
-   * @param textToSend Nội dung tin nhắn (nếu truyền vào từ nút gợi ý)
-   */
   const handleSend = useCallback(
     async (textToSend?: string) => {
       const query = (textToSend ?? input).trim();
-
       if (!query || isLoading) return;
 
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim();
-
-      // Trường hợp chưa cấu hình API KEY
-      if (!apiKey) {
-        const userMsg: Message = {
-          id: createId("user"),
-          sender: "user",
-          text: query,
-          timestamp: formatMessageTime(new Date(), currentLang),
-        };
-
-        const aiMsgId = createId("ai");
-
-        setMessages((prev) => [
-          ...prev,
-          userMsg,
-          {
-            id: aiMsgId,
-            sender: "ai",
-            text: "⚠️ VITE_GEMINI_API_KEY is missing.",
-            timestamp: formatMessageTime(new Date(), currentLang),
-          },
-        ]);
-
-        if (!textToSend) setInput("");
-        return;
-      }
-
       const now = new Date();
-      // Nhận diện ngôn ngữ từ văn bản người dùng
       const responseLanguage = detectResponseLanguage(query, currentLang);
+      const cacheKey = getCacheKey(responseLanguage, query);
 
-      const userMsg: Message = {
+      const userMessage: Message = {
         id: createId("user"),
         sender: "user",
         text: query,
         timestamp: formatMessageTime(now, currentLang),
       };
 
-      const aiMsgId = createId("ai");
-
-      const initialAiMsg: Message = {
-        id: aiMsgId,
-        sender: "ai",
-        text: "",
-        timestamp: formatMessageTime(now, currentLang),
-      };
-
-      // Chỉ gửi vài lượt gần nhất và cắt mỗi lượt để giảm input token + nhiễu.
-      const recentMessages = messages
-        .filter(
-          (message) =>
-            message.id !== "welcome" &&
-            message.text.trim() !== "" &&
-            !isTechnicalAssistantMessage(message.text)
-        )
-        .slice(-MAX_HISTORY_MESSAGES);
-
-      const historyContents = recentMessages.map((message) => ({
-        role: message.sender === "user" ? ("user" as const) : ("model" as const),
-        parts: [{ text: message.text.slice(0, MAX_HISTORY_CHARS) }],
-      }));
-
-      const languageLabel =
-        responseLanguage === "en"
-          ? "ENGLISH"
-          : responseLanguage === "ko"
-            ? "KOREAN"
-            : "VIETNAMESE";
-
-      const latestUserPrompt = `[RESPONSE LANGUAGE: ${languageLabel}]\nAnswer ONLY in ${languageLabel}. Never switch language.\nUse only facts from the portfolio. If a fact is not available, say so.\n\nUSER QUESTION:\n${query}`;
-
-      // Chọn model theo độ phức tạp của câu hỏi: FAQ ngắn → Flash-Lite;
-      // câu hỏi nhiều ý/giải thích kỹ → Flash để tăng độ chính xác.
-      const lowerQuery = query.toLowerCase();
-      const useAccurateModel =
-        query.length > 120 ||
-        (query.match(/[?？！]/g)?.length ?? 0) >= 2 ||
-        /\b(why|how|explain|compare|difference|detail|detailed|architecture|technical|technology|vì sao|tại sao|như thế nào|giải thích|so sánh|chi tiết|kiến trúc|kỹ thuật|công nghệ|왜|어떻게|설명|비교|자세히|기술)\b/i.test(lowerQuery);
-
-      const apiContents = [
-        ...historyContents,
-        {
-          role: "user" as const,
-          parts: [{ text: latestUserPrompt }],
-        },
-      ];
+      const aiMessageId = createId("ai");
 
       setMessages((prev) => [
         ...prev,
-        userMsg,
-        initialAiMsg,
+        userMessage,
+        {
+          id: aiMessageId,
+          sender: "ai",
+          text: "",
+          timestamp: formatMessageTime(now, currentLang),
+        },
       ]);
 
-      if (!textToSend) {
-        setInput("");
+      if (!textToSend) setInput("");
+
+      if (!apiKey) {
+        updateMessage(
+          aiMessageId,
+          "⚠️ VITE_GEMINI_API_KEY chưa được cấu hình."
+        );
+        return;
+      }
+
+      const cached = getCachedResponse(cacheKey);
+      if (cached) {
+        updateMessage(aiMessageId, cached);
+        return;
       }
 
       setIsLoading(true);
+
+      const complex = isComplexQuestion(query);
+      const history = messages
+        .filter(
+          (message) =>
+            message.id !== "welcome" &&
+            message.text.trim()
+        )
+        .slice(-MAX_HISTORY_MESSAGES)
+        .map((message) => ({
+          role: message.sender === "user" ? ("user" as const) : ("model" as const),
+          parts: [{ text: message.text.slice(0, MAX_HISTORY_CHARS) }],
+        }));
+
+      const contents = [
+        ...history,
+        {
+          role: "user" as const,
+          parts: [{ text: query }],
+        },
+      ];
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
       try {
-        // Gọi API Gemini
-        const answerText = await fetchGeminiText(
+        const answer = await fetchGeminiText(
           apiKey,
-          apiContents,
+          contents,
           responseLanguage,
           controller.signal,
-          useAccurateModel
+          complex
         );
 
-        // Câu ngắn vẫn có typewriter; câu dài hiển thị ngay để hiệu ứng
-        // không cộng thêm hàng chục giây vào thời gian người dùng phải chờ.
-        if (answerText.length > MAX_TYPEWRITER_CHARS) {
-          updateMessage(aiMsgId, answerText);
-        } else {
-          let typedText = "";
-          for (
-            let index = 0;
-            index < answerText.length;
-            index += TYPEWRITER_CHARS_PER_TICK
-          ) {
-            if (controller.signal.aborted) return;
+        setCachedResponse(cacheKey, answer);
 
-            typedText += answerText.slice(
-              index,
-              index + TYPEWRITER_CHARS_PER_TICK
+        if (answer.length > TYPEWRITER_LIMIT) {
+          updateMessage(aiMessageId, answer);
+        } else {
+          for (let index = 0; index < answer.length; index += TYPEWRITER_CHUNK) {
+            if (controller.signal.aborted) return;
+            updateMessage(
+              aiMessageId,
+              answer.slice(0, index + TYPEWRITER_CHUNK)
             );
-            updateMessage(aiMsgId, typedText);
-            await sleep(TYPEWRITER_TICK_MS);
+            await new Promise<void>((resolve) =>
+              requestAnimationFrame(() => resolve())
+            );
           }
         }
       } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
+        if (isAbortError(error)) return;
 
-        console.error("[CKy Gemini] Request failed", error);
-        const friendlyMessage = getFriendlyErrorMessage(error, currentLang);
+        console.error("[CKy Gemini]", error);
 
         updateMessage(
-          aiMsgId,
-          `${friendlyMessage}\n\n${t.contactInfo}`
+          aiMessageId,
+          `${getFriendlyErrorMessage(error, currentLang)}\n\n${t.contactInfo}`
         );
       } finally {
         if (abortControllerRef.current === controller) {
           abortControllerRef.current = null;
         }
-
         setIsLoading(false);
       }
     },
-    [input, isLoading, messages, updateMessage, currentLang, t.contactInfo]
+    [input, isLoading, messages, currentLang, t.contactInfo, updateMessage]
   );
+
 
   // --- RENDER GIAO DIỆN (JSX) ---
   return (
