@@ -117,8 +117,7 @@ const MAX_ANSWER_CHARS = 1800;
 const MAX_HISTORY_MESSAGES = 4;
 const MAX_HISTORY_CHARS = 500;
 /** Chỉ typewriter với câu ngắn để hiệu ứng không tạo thêm độ trễ đáng kể */
-const MAX_TYPEWRITER_CHARS = 700;
-const TYPEWRITER_CHARS_PER_TICK = 14;
+const TYPEWRITER_CHARS_PER_TICK = 5;
 const TYPEWRITER_TICK_MS = 8;
 
 /** Endpoint gốc của Google Gemini API */
@@ -475,44 +474,54 @@ function getFriendlyErrorMessage(error: unknown, lang: ResponseLanguage = "vi"):
 
   if (lang === "en") {
     if (message.includes("401") || message.includes("403")) {
-      return "⚠️ The Gemini API key is invalid, restricted, or does not have access to this model.";
+      return "🌷 Oops! CKy hit a little snag. Please try again in a moment 💛";
     }
     if (message.includes("400")) {
-      return "⚠️ Gemini rejected the request format. Please try again.";
+      return "🐣 Hmm... hình như em vừa hiểu sai cách gửi câu hỏi mất rồi. Anh/Chị thử hỏi lại ngắn gọn hơn giúp em nhé!";
     }
     if (message.includes("429") || message.includes("quota")) {
-      return "⏳ Gemini is rate-limited right now. Please try again in a few seconds.";
+      return "⏳ Ui, lúc này có hơi đông một chút! Anh/Chị chờ em vài giây rồi hỏi lại nhé 💫";
     }
-    if (message.includes("503") || message.includes("502") || message.includes("504") || message.includes("timeout")) {
-      return "⏳ The Gemini service is temporarily unavailable. Please try again in a moment.";
+    if (
+      message.includes("503") ||
+      message.includes("502") ||
+      message.includes("504") ||
+      message.includes("timeout")
+    ) {
+      return "🌼 CKy is a little busy right now and could not finish the reply. Please try again in a few seconds 💙";
     }
-    return "⚠️ The AI service could not complete this request. Please try again shortly.";
+    return "✨ Oops! Em vừa gặp một chút trục trặc nhỏ. Anh/Chị thử lại giúp em nhé — em sẽ cố gắng trả lời ngay 💛";
   }
 
   if (lang === "ko") {
     if (message.includes("401") || message.includes("403")) {
-      return "⚠️ Gemini API 키가 올바르지 않거나 이 모델에 대한 접근 권한이 없습니다.";
+      return "🌷 앗! CKy가 잠시 작은 문제를 겪고 있어요. 잠시 후 다시 물어봐 주세요 💛";
     }
     if (message.includes("400")) {
-      return "⚠️ Gemini가 요청 형식을 거부했습니다. 다시 시도해 주세요.";
+      return "🐣 음... 질문을 이해하는 과정에서 조금 꼬였어요. 조금 더 간단하게 다시 물어봐 주세요!";
     }
     if (message.includes("429") || message.includes("quota")) {
-      return "⏳ 현재 Gemini 요청이 많습니다. 잠시 후 다시 시도해 주세요.";
+      return "⏳ 앗, 지금은 조금 붐비고 있어요! 몇 초만 기다렸다가 다시 질문해 주세요 💫";
     }
-    if (message.includes("503") || message.includes("502") || message.includes("504") || message.includes("timeout")) {
-      return "⏳ 현재 Gemini 서비스가 일시적으로 unavailable 상태입니다. 잠시 후 다시 시도해 주세요.";
+    if (
+      message.includes("503") ||
+      message.includes("502") ||
+      message.includes("504") ||
+      message.includes("timeout")
+    ) {
+      return "🌼 CKy가 잠시 바빠서 바로 답변하지 못했어요. 몇 초 후 다시 물어봐 주세요. 여기서 기다리고 있을게요 💙";
     }
-    return "⚠️ 현재 AI 서비스가 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    return "✨ 앗! 잠시 작은 문제가 생겼어요. 다시 한 번 물어봐 주세요. 곧 도와드릴게요 💛";
   }
 
   if (message.includes("401") || message.includes("403")) {
-    return "⚠️ Gemini API key không hợp lệ, bị giới hạn hoặc chưa có quyền dùng model này.";
+    return "🌷 Ôi, CKy vừa gặp một trục trặc nhỏ mất rồi ạ. Anh/Chị thử lại sau một chút giúp em nhé 💛";
   }
   if (message.includes("400")) {
-    return "⚠️ Gemini từ chối định dạng request. Anh/Chị vui lòng thử lại nhé!";
+    return "🐣 Hic... hình như em vừa hiểu sai cách gửi câu hỏi mất rồi ạ. Anh/Chị thử hỏi lại ngắn gọn hơn giúp em nhé!";
   }
   if (message.includes("429") || message.includes("quota")) {
-    return "⏳ Gemini đang giới hạn lưu lượng. Anh/Chị vui lòng thử lại sau vài giây nhé!";
+    return "⏳ Ui, lúc này hơi đông một chút rồi ạ! Anh/Chị chờ em vài giây rồi hỏi lại nhé 💫";
   }
   if (
     message.includes("503") ||
@@ -520,10 +529,10 @@ function getFriendlyErrorMessage(error: unknown, lang: ResponseLanguage = "vi"):
     message.includes("504") ||
     message.includes("timeout")
   ) {
-    return "⏳ Dịch vụ Gemini đang tạm thời quá tải hoặc không khả dụng. Anh/Chị vui lòng thử lại sau ít giây nhé!";
+    return "🌼 CKy đang hơi bận một chút nên chưa kịp trả lời ạ. Anh/Chị thử lại sau vài giây nhé, em vẫn ở đây 💙";
   }
 
-  return "⚠️ Hệ thống AI chưa thể xử lý yêu cầu này. Anh/Chị vui lòng thử lại sau ít giây nhé!";
+  return "✨ Ôi, em vừa gặp một chút trục trặc nhỏ thôi ạ. Anh/Chị thử lại giúp em nhé — CKy vẫn sẵn sàng hỗ trợ mình 💛";
 }
 
 // ==========================================
@@ -759,24 +768,21 @@ export function Chatbox({ lang = "vi" }: ChatboxProps) {
 
         // Câu ngắn vẫn có typewriter; câu dài hiển thị ngay để hiệu ứng
         // không cộng thêm hàng chục giây vào thời gian người dùng phải chờ.
-        if (answerText.length > MAX_TYPEWRITER_CHARS) {
-          updateMessage(aiMsgId, answerText);
-        } else {
-          let typedText = "";
-          for (
-            let index = 0;
-            index < answerText.length;
-            index += TYPEWRITER_CHARS_PER_TICK
-          ) {
-            if (controller.signal.aborted) return;
+        // Giữ hiệu ứng chữ chạy cho mọi câu trả lời nhưng chạy nhanh.
+        let typedText = "";
+        for (
+          let index = 0;
+          index < answerText.length;
+          index += TYPEWRITER_CHARS_PER_TICK
+        ) {
+          if (controller.signal.aborted) return;
 
-            typedText += answerText.slice(
-              index,
-              index + TYPEWRITER_CHARS_PER_TICK
-            );
-            updateMessage(aiMsgId, typedText);
-            await sleep(TYPEWRITER_TICK_MS);
-          }
+          typedText += answerText.slice(
+            index,
+            index + TYPEWRITER_CHARS_PER_TICK
+          );
+          updateMessage(aiMsgId, typedText);
+          await sleep(TYPEWRITER_TICK_MS);
         }
       } catch (error) {
         if (isAbortError(error)) {
