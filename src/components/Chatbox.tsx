@@ -91,18 +91,22 @@ const CHATBOX_I18N = {
   },
 } as const;
 
-/** Danh sách model Gemini dùng để gọi API (Ưu tiên model trước, lỗi chuyển model sau) */
+/**
+ * Danh sách model Gemini dùng cho chatbot portfolio.
+ * Ưu tiên model Flash-Lite có độ trễ thấp, sau đó mới chuyển sang model dự phòng.
+ * Lưu ý: Gemini 3.8/3.7 không cần thiết cho chatbot FAQ và có thể chịu tải cao hơn.
+ */
 const GEMINI_MODELS = [
   "gemini-3.5-flash-lite",
   "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
 ] as const;
 
-/** Mã lỗi HTTP cho phép Retry lại request */
-const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
-/** Số lần retry tối đa cho mỗi Model */
-const MAX_RETRIES_PER_MODEL = 1;
-/** Thời gian chờ giữa các lần retry (ms) */
-const RETRY_DELAY_MS = 650;
+/** Mã lỗi HTTP có thể chuyển sang model khác ngay */
+const FAILOVER_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+/** Thời gian chờ retry ngắn cho 429 */
+const RETRY_DELAY_MS = 550;
 /** Thời gian timeout tối đa cho mỗi request (ms) */
 const REQUEST_TIMEOUT_MS = 8000;
 /** Giới hạn số ký tự tối đa của câu trả lời */
@@ -306,9 +310,12 @@ async function fetchGeminiText(
   let lastStatus = 0;
   let lastBody = "";
 
-  // Thử lần lượt từng Model trong danh sách GEMINI_MODELS
+  // Thử lần lượt từng model. Các lỗi 5xx/timeout sẽ chuyển model ngay.
+  // Chỉ 429 được retry 1 lần vì đây thường là rate limit tạm thời.
   for (const modelName of GEMINI_MODELS) {
-    for (let attempt = 0; attempt < MAX_RETRIES_PER_MODEL + 1; attempt += 1) {
+    let retried429 = false;
+
+    while (true) {
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
       const controller = new AbortController();
@@ -332,7 +339,7 @@ async function fetchGeminiText(
               systemInstruction: {
                 parts: [
                   {
-                    text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp.\n- Ưu tiên 2-5 câu ngắn hoặc các gạch đầu dòng cần thiết.\n- Không suy đoán thông tin cá nhân chưa có.\n- Không lặp lại câu hỏi của người dùng.\n\n${getLanguageInstruction(responseLanguage)}`,
+                    text: `${SYSTEM_INSTRUCTION}\n\nQUY TẮC CHATBOX PORTFOLIO:\n- Chỉ trả lời dựa trên thông tin portfolio được cung cấp.\n- Ưu tiên 2-5 câu ngắn hoặc các gạch đầu dòng cần thiết.\n- Không suy đoán thông tin cá nhân chưa có.\n- Không lặp lại câu hỏi của người dùng.\n- Trả lời đúng ngôn ngữ của câu hỏi hiện tại theo chỉ thị bên dưới.\n\n${getLanguageInstruction(responseLanguage)}`,
                   },
                 ],
               },
@@ -376,15 +383,29 @@ async function fetchGeminiText(
         lastStatus = response.status;
         lastBody = await readErrorBody(response);
 
-        // Đóng các lỗi do API Key không hợp lệ hoặc thiếu quyền
-        if (response.status === 400 || response.status === 401 || response.status === 403) {
+        // API key / quyền truy cập sai: dừng ngay để báo lỗi rõ ràng.
+        if (
+          response.status === 400 ||
+          response.status === 401 ||
+          response.status === 403
+        ) {
           throw new Error(getApiErrorMessage(response.status, lastBody));
         }
 
-        // Nếu mã lỗi không thuộc loại Retryable thì bỏ qua thử lại
-        if (!RETRYABLE_STATUS.has(response.status) || attempt >= MAX_RETRIES_PER_MODEL) {
+        // 429: retry đúng 1 lần với delay rất ngắn, sau đó mới failover.
+        if (response.status === 429 && !retried429) {
+          retried429 = true;
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+
+        // 503/5xx/408: không retry trên cùng model, chuyển model ngay.
+        if (FAILOVER_STATUS.has(response.status)) {
           break;
         }
+
+        // Mã lỗi ngoài danh sách: chuyển model để tăng khả năng phục hồi.
+        break;
       } catch (error) {
         if (isAbortError(error)) {
           if (signal.aborted) throw error;
@@ -407,9 +428,7 @@ async function fetchGeminiText(
         signal.removeEventListener("abort", forwardAbort);
       }
 
-      if (attempt < MAX_RETRIES_PER_MODEL) {
-        await sleep(RETRY_DELAY_MS);
-      }
+      break;
     }
   }
 
@@ -424,23 +443,60 @@ async function fetchGeminiText(
  * Chuyển các lỗi kỹ thuật thành câu thông báo lỗi thân thiện cho UI người dùng
  */
 function getFriendlyErrorMessage(error: unknown, lang: ResponseLanguage = "vi"): string {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
 
   if (lang === "en") {
-    if (message.includes("429") || message.includes("quota")) return "⏳ Gemini API is temporarily busy. Please try again in a few seconds!";
-    return "Dạ em rất tiếc, current AI service is unavailable. Please try again shortly!";
+    if (message.includes("401") || message.includes("403")) {
+      return "⚠️ The Gemini API key is invalid, restricted, or does not have access to this model.";
+    }
+    if (message.includes("400")) {
+      return "⚠️ Gemini rejected the request format. Please try again.";
+    }
+    if (message.includes("429") || message.includes("quota")) {
+      return "⏳ Gemini is rate-limited right now. Please try again in a few seconds.";
+    }
+    if (message.includes("503") || message.includes("502") || message.includes("504") || message.includes("timeout")) {
+      return "⏳ The Gemini service is temporarily unavailable. Please try again in a moment.";
+    }
+    return "⚠️ The AI service could not complete this request. Please try again shortly.";
   }
 
   if (lang === "ko") {
-    if (message.includes("429") || message.includes("quota")) return "⏳ AI 서비스 요청이 많아 잠시 지연되고 있습니다. 잠시 후 다시 시도해 주세요!";
-    return "죄송합니다. 현재 AI 시스템에 오류가 발생했습니다. 잠시 후 다시 시도해 주세요!";
+    if (message.includes("401") || message.includes("403")) {
+      return "⚠️ Gemini API 키가 올바르지 않거나 이 모델에 대한 접근 권한이 없습니다.";
+    }
+    if (message.includes("400")) {
+      return "⚠️ Gemini가 요청 형식을 거부했습니다. 다시 시도해 주세요.";
+    }
+    if (message.includes("429") || message.includes("quota")) {
+      return "⏳ 현재 Gemini 요청이 많습니다. 잠시 후 다시 시도해 주세요.";
+    }
+    if (message.includes("503") || message.includes("502") || message.includes("504") || message.includes("timeout")) {
+      return "⏳ 현재 Gemini 서비스가 일시적으로 unavailable 상태입니다. 잠시 후 다시 시도해 주세요.";
+    }
+    return "⚠️ 현재 AI 서비스가 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
 
+  if (message.includes("401") || message.includes("403")) {
+    return "⚠️ Gemini API key không hợp lệ, bị giới hạn hoặc chưa có quyền dùng model này.";
+  }
+  if (message.includes("400")) {
+    return "⚠️ Gemini từ chối định dạng request. Anh/Chị vui lòng thử lại nhé!";
+  }
   if (message.includes("429") || message.includes("quota")) {
-    return "⏳ Gemini đang giới hạn lưu lượng hoặc quota tạm thời. Anh/Chị vui lòng thử lại sau vài giây nhé!";
+    return "⏳ Gemini đang giới hạn lưu lượng. Anh/Chị vui lòng thử lại sau vài giây nhé!";
+  }
+  if (
+    message.includes("503") ||
+    message.includes("502") ||
+    message.includes("504") ||
+    message.includes("timeout")
+  ) {
+    return "⏳ Dịch vụ Gemini đang tạm thời quá tải hoặc không khả dụng. Anh/Chị vui lòng thử lại sau ít giây nhé!";
   }
 
-  return "Dạ em rất tiếc, hiện tại hệ thống AI đang gặp sự cố. Anh/Chị vui lòng thử lại sau ít giây ạ!";
+  return "⚠️ Hệ thống AI chưa thể xử lý yêu cầu này. Anh/Chị vui lòng thử lại sau ít giây nhé!";
 }
 
 // ==========================================
