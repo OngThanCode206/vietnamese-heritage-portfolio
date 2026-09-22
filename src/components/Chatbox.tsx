@@ -93,14 +93,14 @@ const CHATBOX_I18N = {
 
 /**
  * Danh sách model Gemini dùng cho chatbot portfolio.
- * Ưu tiên model Flash-Lite có độ trễ thấp, sau đó mới chuyển sang model dự phòng.
- * Lưu ý: Gemini 3.8/3.7 không cần thiết cho chatbot FAQ và có thể chịu tải cao hơn.
+ * Ưu tiên Gemini 3.8 Flash cho chất lượng + tốc độ, sau đó mới fallback.
  */
-const GEMINI_FAST_MODEL = "gemini-3.6-flash" as const;
-const GEMINI_ACCURATE_MODEL = "gemini-3.6-flash" as const;
+const GEMINI_FAST_MODEL = "gemini-3.8-flash" as const;
+const GEMINI_ACCURATE_MODEL = "gemini-3.8-flash" as const;
 const GEMINI_FALLBACK_MODELS = [
+  "gemini-3.7-flash",
   "gemini-3.5-flash",
-  "gemini-3.1-flash-lite",
+  "gemini-2.5-flash",
 ] as const;
 
 /** Mã lỗi có thể chuyển model ngay để giảm thời gian chờ */
@@ -358,7 +358,7 @@ async function fetchGeminiText(
     );
 
     try {
-      const thinkingLevel = useAccurateModel ? "low" : "minimal";
+      const thinkingLevel = "low";
       const maxOutputTokens = useAccurateModel ? 520 : 340;
 
       const response = await fetch(
