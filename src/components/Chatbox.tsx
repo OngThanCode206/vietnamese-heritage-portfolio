@@ -339,18 +339,25 @@ async function fetchGeminiText(
   for (const modelName of models) {
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-    const elapsed = performance.now() - startedAt;
-    const remaining = TOTAL_DEADLINE_MS - elapsed;
-    if (remaining <= 0) break;
+   const elapsed = performance.now() - startedAt;
+  const remaining = TOTAL_DEADLINE_MS - elapsed;
 
-    const controller = new AbortController();
-    const forwardAbort = () => controller.abort();
-    signal.addEventListener("abort", forwardAbort, { once: true });
-    const remaining = TOTAL_DEADLINE_MS - (performance.now() - startedAt);
-    const timeoutId = window.setTimeout(
-      () => controller.abort(),
-      Math.min(REQUEST_TIMEOUT_MS, Math.max(1500, remaining))
-    );
+  if (remaining <= 0) {
+    break;
+  }
+
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort();
+
+  signal.addEventListener("abort", forwardAbort, { once: true });
+
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    Math.min(
+      REQUEST_TIMEOUT_MS,
+      Math.max(1500, remaining)
+    )
+  );
 
     try {
       // Tất cả model đều dùng low để giảm latency; câu hỏi dài vẫn ưu tiên chất lượng
