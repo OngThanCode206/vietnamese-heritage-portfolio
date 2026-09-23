@@ -4,9 +4,6 @@ import ReactMarkdown from "react-markdown";
 import { SYSTEM_INSTRUCTION } from "../config/aiPrompt";
 import chatAvatar from "@/assets/dai_dien_chatbox.png";
 
-// ==========================================
-// 1. CÁC KIỂU DỮ LIỆU & INTERFACE (TYPES)
-// ==========================================
 
 /** Danh sách mã ngôn ngữ phản hồi được hỗ trợ */
 export type ResponseLanguage = "vi" | "en" | "ko";
